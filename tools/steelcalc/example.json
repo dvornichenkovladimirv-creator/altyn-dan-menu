@@ -1,0 +1,7 @@
+[
+  {"element": "beam", "name": "Б-1, балка перекрытия", "scheme": "simple",
+   "section": {"type": "gost8239", "number": "24"}, "steel": "С245", "gamma_c": 1.0,
+   "L": 6.0, "q": 10.0, "qn": 8.0},
+  {"element": "column", "name": "К-1, колонна", "section": {"type": "rect_tube", "h": 140, "b": 140, "t": 6},
+   "steel": "С345", "N": 450, "Lx": 4.2, "Ly": 4.2, "mu_x": 1.0, "mu_y": 1.0}
+]
