@@ -1,0 +1,124 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  name      String
+  password  String
+  role      String   @default("STOREKEEPER")
+  createdAt DateTime @default(now())
+}
+
+model Unit {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  shortName String
+  products  Product[]
+}
+
+model Warehouse {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  address   String?
+  createdAt DateTime @default(now())
+
+  balances      StockBalance[]
+  movements     StockMovement[]
+  documentsFrom Document[]      @relation("DocFromWarehouse")
+  documentsTo   Document[]      @relation("DocToWarehouse")
+}
+
+model Supplier {
+  id        Int        @id @default(autoincrement())
+  name      String     @unique
+  phone     String?
+  createdAt DateTime   @default(now())
+  documents Document[]
+}
+
+model Product {
+  id         Int      @id @default(autoincrement())
+  name       String
+  sku        String?  @unique
+  unitId     Int
+  unit       Unit     @relation(fields: [unitId], references: [id])
+  minStock   Float    @default(0)
+  costPrice  Float    @default(0)
+  createdAt  DateTime @default(now())
+
+  balances      StockBalance[]
+  movements     StockMovement[]
+  documentItems DocumentItem[]
+
+  @@index([unitId])
+}
+
+model StockBalance {
+  id          Int       @id @default(autoincrement())
+  productId   Int
+  product     Product   @relation(fields: [productId], references: [id])
+  warehouseId Int
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
+  quantity    Float     @default(0)
+  avgCost     Float     @default(0)
+
+  @@unique([productId, warehouseId])
+  @@index([warehouseId])
+}
+
+model Document {
+  id            Int          @id @default(autoincrement())
+  type          String
+  number        String       @unique
+  date          DateTime     @default(now())
+  comment       String?
+  supplierId    Int?
+  supplier      Supplier?    @relation(fields: [supplierId], references: [id])
+  fromWarehouseId Int?
+  fromWarehouse   Warehouse? @relation("DocFromWarehouse", fields: [fromWarehouseId], references: [id])
+  toWarehouseId   Int?
+  toWarehouse     Warehouse? @relation("DocToWarehouse", fields: [toWarehouseId], references: [id])
+  createdAt     DateTime     @default(now())
+
+  items     DocumentItem[]
+  movements StockMovement[]
+}
+
+model DocumentItem {
+  id         Int      @id @default(autoincrement())
+  documentId Int
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  productId  Int
+  product    Product  @relation(fields: [productId], references: [id])
+  quantity   Float
+  price      Float    @default(0)
+  countedQty Float?
+
+  @@index([documentId])
+  @@index([productId])
+}
+
+model StockMovement {
+  id          Int      @id @default(autoincrement())
+  productId   Int
+  product     Product  @relation(fields: [productId], references: [id])
+  warehouseId Int
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
+  direction   String
+  quantity    Float
+  cost        Float
+  documentId  Int
+  document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@index([productId])
+  @@index([warehouseId])
+  @@index([documentId])
+}

@@ -1,0 +1,13 @@
+node_modules/
+dist/
+build/
+*.log
+
+# Server
+server/prisma/dev.db
+server/prisma/dev.db-journal
+server/.env
+
+# Client
+client/.vite/
+client/tsconfig.tsbuildinfo
