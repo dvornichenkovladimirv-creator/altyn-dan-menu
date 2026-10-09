@@ -103,15 +103,36 @@ def canvas(photo, w, h, focus, stops):
     return img, ImageDraw.Draw(img, "RGBA")
 
 
+def band(img, photo, y, h, focus=(0.5, 0.5), fade=140):
+    """Фото полосой на всю ширину, верх и низ плавно уходят в фон."""
+    w = img.width
+    ph = cover(PHOTOS / photo, w, h, focus)
+    mask = Image.new("L", (1, h), 255)
+    for i in range(fade):
+        a = round(255 * (i / fade) ** 1.5)
+        mask.putpixel((0, i), a)
+        mask.putpixel((0, h - 1 - i), a)
+    img.paste(ph, (0, y), mask.resize((w, h)))
+
+
+def dark(w, h):
+    img = Image.new("RGB", (w, h), BG)
+    return img, ImageDraw.Draw(img, "RGBA")
+
+
+REAL = "real-table.jpg"  # фото реального стола заказчика
+
+
 # ---------- Instagram 1080×1350 ----------
 
 def ig1():
-    img, d = canvas("hero.jpg", 1080, 1350, (0.5, 0.62), [(0, 0.85), (0.38, 0.35), (0.6, 0), (0.88, 0), (1, 0.75)])
+    img, d = dark(1080, 1350)
+    band(img, REAL, 430, 860, (0.6, 0.5))
     header(d, 1080, "1/5")
     text(d, (M, 250), "Лофт-стол", font("ExtraBold", 112), WHITE, "ls")
     text(d, (M, 340), "не должен шататься", font("ExtraBold", 72), ORANGE, "ls")
     text(d, (M, 405), "Разбираем, что решает каркас", font("Medium", 40), LIGHT, "ls")
-    text(d, (540, 1290), "Листайте →", font("Bold", 36), WHITE, "mm")
+    text(d, (540, 1300), "Листайте →", font("Bold", 36), WHITE, "mm")
     return img
 
 
@@ -177,22 +198,24 @@ def ig4():
 
 
 def ig5():
-    img, d = canvas("interior.jpg", 1080, 1350, (0.5, 0.6), [(0, 0.92), (0.36, 0.55), (0.5, 0.05), (0.7, 0.1), (0.82, 0.9), (1, 1)])
+    img, d = dark(1080, 1350)
+    band(img, REAL, 470, 640, (0.62, 0.55), fade=110)
     header(d, 1080, "5/5")
     text(d, (M, 230), "Под ваш интерьер", font("ExtraBold", 84), WHITE, "ls")
     for i, line in enumerate(["размер — под помещение", "цвет каркаса — на выбор", "столешница — массив или слэб"]):
-        y = 320 + i * 80
+        y = 320 + i * 70
         d.line([(M, y - 10), (M + 14, y + 4), (M + 38, y - 24)], fill=ORANGE, width=5, joint="curve")
-        text(d, (M + 60, y), line, font("SemiBold", 42), WHITE, "ls")
-    text(d, (540, 1140), "Напишите, что нужно: стол, стеллаж, консоль", font("SemiBold", 34), WHITE, "mm")
-    button(d, 540, 1190, "Директ или WhatsApp →", font("ExtraBold", 50))
+        text(d, (M + 60, y), line, font("SemiBold", 40), WHITE, "ls")
+    text(d, (540, 1150), "Напишите, что нужно: стол, стеллаж, консоль", font("SemiBold", 34), WHITE, "mm")
+    button(d, 540, 1195, "Директ или WhatsApp →", font("ExtraBold", 50))
     return img
 
 
 # ---------- WhatsApp-статусы 1080×1920 ----------
 
 def wa1():
-    img, d = canvas("hero.jpg", 1080, 1920, (0.5, 0.5), [(0, 0.85), (0.28, 0.3), (0.42, 0), (0.75, 0), (0.86, 0.85), (1, 1)])
+    img, d = dark(1080, 1920)
+    band(img, REAL, 500, 1040, (0.62, 0.5))
     header(d, 1080)
     text(d, (540, 330), "Лофт-мебель", font("ExtraBold", 112), WHITE, "ms")
     text(d, (540, 420), "на стальном каркасе", font("ExtraBold", 66), ORANGE, "ms")
@@ -203,25 +226,27 @@ def wa1():
 
 
 def wa2():
-    # Точки выносок подобраны под кадр hero.jpg (столешница, сварной угол, нога).
-    img, d = canvas("hero.jpg", 1080, 1920, (0.5, 0.5), [(0, 0.85), (0.22, 0.3), (0.34, 0), (0.78, 0), (0.88, 0.85), (1, 1)])
+    # Фото 2000×1500 → полоса 1080×1000 с y=480: x' = x·⅔ − 286, y' = y·⅔ + 480.
+    img, d = dark(1080, 1920)
+    band(img, REAL, 480, 1000, (0.62, 0.5))
     header(d, 1080)
     text(d, (540, 290), "Почему не шатается", font("ExtraBold", 80), WHITE, "ms")
-    callout(d, (560, 1060), (M, 560), "Массив дерева", "или слэб")
-    callout(d, (650, 1300), (1080 - M, 1560), "Сварные узлы", "а не только болты", align="r")
-    callout(d, (665, 1500), (M, 1640), "Порошковая краска", "или лак по металлу")
+    callout(d, (681, 700), (M, 420), "Массив дерева", "или слэб")
+    callout(d, (364, 845), (M, 1580), "Сварные узлы", "а не только болты")
+    callout(d, (887, 1013), (1080 - M, 1580), "Порошковая краска", "или лак по металлу", align="r")
     dots(d, 1080, 1920, 1)
     return img
 
 
 def wa3():
-    img, d = canvas("interior.jpg", 1080, 1920, (0.5, 0.55), [(0, 0.9), (0.28, 0.4), (0.4, 0), (0.66, 0), (0.76, 0.9), (1, 1)])
+    img, d = dark(1080, 1920)
+    band(img, REAL, 520, 860, (0.58, 0.5))
     header(d, 1080)
     text(d, (540, 370), "Сделаем", font("ExtraBold", 120), WHITE, "ms")
     text(d, (540, 470), "под ваш размер", font("ExtraBold", 92), ORANGE, "ms")
-    text(d, (540, 1430), "Напишите, что нужно: стол, стеллаж", font("SemiBold", 40), WHITE, "ms")
-    text(d, (540, 1488), "или консоль — и примерные размеры", font("SemiBold", 40), WHITE, "ms")
-    button(d, 540, 1540, "Ответьте на этот статус →", font("ExtraBold", 50))
+    text(d, (540, 1450), "Напишите, что нужно: стол, стеллаж", font("SemiBold", 40), WHITE, "ms")
+    text(d, (540, 1508), "или консоль — и примерные размеры", font("SemiBold", 40), WHITE, "ms")
+    button(d, 540, 1560, "Ответьте на этот статус →", font("ExtraBold", 50))
     dots(d, 1080, 1920, 2)
     return img
 
