@@ -121,6 +121,9 @@ def dark(w, h):
 
 
 REAL = "real-table.jpg"  # фото реального стола заказчика
+# крупные кадры из того же фото, чтобы слайды не повторялись
+REAL_LEG = "real-leg.jpg"
+REAL_CORNER = "real-corner.jpg"
 
 
 # ---------- Instagram 1080×1350 ----------
@@ -199,7 +202,7 @@ def ig4():
 
 def ig5():
     img, d = dark(1080, 1350)
-    band(img, REAL, 470, 640, (0.62, 0.55), fade=110)
+    band(img, REAL_LEG, 470, 640, (0.5, 0.4), fade=110)
     header(d, 1080, "5/5")
     text(d, (M, 230), "Под ваш интерьер", font("ExtraBold", 84), WHITE, "ls")
     for i, line in enumerate(["размер — под помещение", "цвет каркаса — на выбор", "столешница — массив или слэб"]):
@@ -240,7 +243,7 @@ def wa2():
 
 def wa3():
     img, d = dark(1080, 1920)
-    band(img, REAL, 520, 860, (0.58, 0.5))
+    band(img, REAL_CORNER, 520, 860, (0.5, 0.55))
     header(d, 1080)
     text(d, (540, 370), "Сделаем", font("ExtraBold", 120), WHITE, "ms")
     text(d, (540, 470), "под ваш размер", font("ExtraBold", 92), ORANGE, "ms")
