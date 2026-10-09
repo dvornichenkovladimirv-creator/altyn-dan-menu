@@ -1,0 +1,18 @@
+{
+  "hero": {
+    "prompt": "Loft-style dining table, three-quarter view from slightly above. Thick solid oak plank tabletop with visible grain and oiled finish. Base: two closed rectangular sled-style legs welded from black matte powder-coated 60x60 mm square steel tube, connected by a straight steel crossbar under the top. Room: dark industrial loft with raw concrete wall and dark floor, soft directional window light from the left. The table sits in the lower 55% of the vertical frame; the upper part of the frame is dark, calm, empty wall, suitable for overlaying headline text."
+  },
+  "profiles": {
+    "prompt": "Close-up still life: two short cut pieces of black square steel profile tube standing upright on a dark steel workbench, ends facing the camera at a slight angle so the hollow square cross-sections and wall thickness are clearly visible. Left piece is smaller 40x40 mm, right piece is larger 60x60 mm with a thicker wall. Clean saw cuts with a slight bright metal edge. Dark background with soft rim light. Subjects placed in the middle of the vertical frame with empty dark space above and below."
+  },
+  "weld": {
+    "prompt": "Macro photograph of a welded corner joint of a loft table frame: black matte powder-coated square steel tube leg meeting the horizontal crossbar under a thick oak tabletop edge. Weld seam is ground smooth and painted over, joint looks solid and seamless. Shallow depth of field, dramatic side light highlighting the steel edges and wood grain. Joint located in the center-right of the vertical frame, darker empty area in the upper part."
+  },
+  "coating": {
+    "prompt": "Side by side comparison of two steel table legs made of square tube, standing on dark concrete floor: left leg finished in smooth matte black powder coating, right leg is raw steel under clear lacquer showing natural mill scale texture, blue-grey tones and visible weld seams. Soft studio light, dark background, both legs fully visible and evenly lit.",
+    "size": "1536x1024"
+  },
+  "interior": {
+    "prompt": "Loft workspace interior: a long loft table with a thick walnut-toned solid wood slab top and a black square steel tube frame, behind it a tall black steel shelving rack with books and plants, and a narrow steel console by the brick wall. Warm evening light from pendant lamps, dark atmospheric mood. Furniture occupies the middle and lower part of the vertical frame, upper part is dark brick wall and ceiling, calm for text overlay."
+  }
+}
