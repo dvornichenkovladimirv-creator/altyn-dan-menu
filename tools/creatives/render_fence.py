@@ -86,16 +86,16 @@ def slide3(w, h):
         img, d = canvas("row.jpg", w, h, (0.5, 1.0), [(0, 0.95), (0.2, 0.85), (0.3, 0.3), (0.4, 0), (0.76, 0), (0.84, 0.9), (1, 0.95)])
         head(d, w, "3/3")
         text(d, (M, 220), "Под вашу площадку", font("ExtraBold", 78), WHITE, "ls")
-        text(d, (M, 290), "любая длина · цвет по RAL", font("ExtraBold", 48), ORANGE, "ls")
-        text(d, (540, 1180), "Пришлите длину ограждения — посчитаем", font("SemiBold", 34), WHITE, "mm")
+        text(d, (M, 290), "любое число секций · цвет по RAL", font("ExtraBold", 48), ORANGE, "ls")
+        text(d, (540, 1180), "Напишите, сколько секций нужно — посчитаем", font("SemiBold", 34), WHITE, "mm")
         button(d, 540, 1220, "Директ или WhatsApp →", font("ExtraBold", 50))
     else:
         img, d = canvas("row.jpg", w, h, (0.5, 0.5), [(0, 0.95), (0.25, 0.88), (0.34, 0.3), (0.42, 0), (0.8, 0), (0.86, 0.9), (1, 0.95)])
         head(d, w)
         text(d, (540, 300), "Под вашу", font("ExtraBold", 110), WHITE, "ms")
         text(d, (540, 400), "площадку", font("ExtraBold", 110), WHITE, "ms")
-        text(d, (540, 480), "любая длина · цвет по RAL", font("ExtraBold", 54), ORANGE, "ms")
-        text(d, (540, 1700), "Пришлите длину ограждения — посчитаем", font("SemiBold", 36), WHITE, "mm")
+        text(d, (540, 480), "любое число секций · цвет по RAL", font("ExtraBold", 46), ORANGE, "ms")
+        text(d, (540, 1700), "Напишите, сколько секций нужно — посчитаем", font("SemiBold", 36), WHITE, "mm")
         button(d, 540, 1745, "Написать в WhatsApp →", font("ExtraBold", 50))
     return img
 
