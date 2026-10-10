@@ -1,0 +1,11 @@
+{
+  "_style": "Photorealistic commercial photograph of a real installed city fence, sunny autumn day, clear blue sky, natural daylight with crisp shadows, granite paving. The fence must match the reference image exactly: same design, proportions and the same brown polymer powder-coated square steel tubes. No text, no logos, no watermarks, no people.",
+  "detail": {
+    "ref": "section.png",
+    "prompt": "Close-up photo of this exact fence section: the center where the vertical middle post, the top horizontal rail and the diagonal cross braces meet. Clearly show that all members are rectangular steel profile tubes with smooth, even brown polymer powder coating and neat welded joints with no gaps. Shallow depth of field, blurred city square in the background. Joint placed in the middle of the vertical frame."
+  },
+  "row": {
+    "ref": "section.png",
+    "prompt": "Wide photo of a long fence made of many identical sections like the reference, installed in a straight line along the edge of a paved city square, separating the pedestrian area from a flower bed and lawn. Perspective view along the fence, sections recede into the distance, trees and modern buildings behind. Fence occupies the middle and lower part of the vertical frame, sky in the upper part."
+  }
+}
