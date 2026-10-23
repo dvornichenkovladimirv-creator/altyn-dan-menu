@@ -21,7 +21,7 @@
       case 'rod': return Math.PI * D * D / 4 * STEEL;
       case 'strip': return a * t * STEEL;
       case 'sheet': return t * 7.85; // кг/м²
-      default: return +m.kgPerUnit || 0; // custom: вес задан вручную
+      default: return +m.kgPerUnit || 0; // custom и profile (швеллер и т.п.): вес задан вручную
     }
   }
 
@@ -29,6 +29,8 @@
     if (kind === 'sheet') return 'м²';
     return kind === 'custom' ? null : 'м';
   }
+  // Прокат, который режут из хлыстов
+  function isBar(m) { return !!m && m.kind !== 'sheet' && m.kind !== 'custom'; }
 
   // Цена единицы (метра/м²/шт) с учётом режима цены
   function unitPrice(m) {
@@ -37,7 +39,7 @@
   }
 
   function materialKg(m) {
-    return m.kind === 'custom' ? (+m.kgPerUnit || 0) : kgPerUnit(m);
+    return m.kind === 'custom' || m.kind === 'profile' ? (+m.kgPerUnit || 0) : kgPerUnit(m);
   }
 
   /* ---------- Формулы: 2*W+2*H, ceil(W/0,5)+1, max(H;2) ---------- */
@@ -163,10 +165,11 @@
     var kgOne = sum(lines, 'kg'), costOne = sum(lines, 'cost');
     // Отходы считаем только на прокат, который режется: не на петли, замки и т.п.
     var cutCost = sum(lines.filter(function (l) { return l.material && l.material.kind !== 'custom'; }), 'cost');
+    var barCost = sum(lines.filter(function (l) { return isBar(l.material); }), 'cost');
     return {
       lines: lines,
       kgOne: kgOne, costOne: costOne,
-      kg: kgOne * count, metalCost: costOne * count, cutCost: cutCost * count,
+      kg: kgOne * count, metalCost: costOne * count, cutCost: cutCost * count, barCost: barCost * count,
       hours: hours.value * count,
       errors: lines.filter(function (l) { return l.error; }).length + (hours.error ? 1 : 0)
     };
@@ -225,7 +228,7 @@
       var vars = paramVars(it.params, it.values), cnt = Math.max(0, Math.round(+it.count || 0));
       (it.parts || []).forEach(function (p) {
         var m = byId[p.materialId];
-        if (!m || m.kind === 'sheet' || m.kind === 'custom') return;
+        if (!isBar(m)) return;
         var q = partQty(p, vars);
         if (q.error || q.value <= 0) return;
         var g = groups[m.id] = groups[m.id] || { material: m, pieces: [], uncut: 0 };
@@ -388,13 +391,23 @@
     var kg = sum(items, 'kg');
     var metalRaw = sum(items, 'metalCost');
     var waste = sum(items, 'cutCost') * (+s.wastePct || 0) / 100;
+    // Поставщик отпускает прокат целыми хлыстами: считаем металл по карте реза, остаток хлыста — это и есть отход
+    var barsNote = '';
+    if (s.wholeBars) {
+      var plans = orderCutPlans(order, materials, s);
+      var bought = plans.reduce(function (a, p) { return a + p.bars.length * p.stock * unitPrice(p.material); }, 0);
+      var barNet = sum(items, 'barCost');
+      metalRaw = metalRaw - barNet + bought;
+      waste = (sum(items, 'cutCost') - barNet) * (+s.wastePct || 0) / 100;
+      if (plans.length) barsNote = ', прокат целыми хлыстами';
+    }
     var kgGross = kg * (1 + (+s.wastePct || 0) / 100);
     var o = order.options || {};
 
     var rows = [];
     function add(key, label, value, hint) { if (value) rows.push({ key: key, label: label, value: value, hint: hint || '' }); }
 
-    add('metal', 'Металл', metalRaw, fmtNum(kg, 1) + ' кг');
+    add('metal', 'Металл', metalRaw, fmtNum(kg, 1) + ' кг' + barsNote);
     add('waste', 'Обрезки и отходы', waste, (s.wastePct || 0) + '%');
     add('consum', 'Расходники (электроды, диски, газ)', kgGross * (+s.consumablesPerKg || 0), fmtNum(s.consumablesPerKg) + '/кг');
     if (o.paint) add('paint', 'Грунт и покраска', kgGross * (+s.paintPerKg || 0), fmtNum(s.paintPerKg) + '/кг');
@@ -444,7 +457,7 @@
     return v.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: d });
   }
 
-  /* ---------- Базовый каталог и настройки (примерные цены, Казахстан) ---------- */
+  /* ---------- Базовый каталог: цены Траст-Караганда от 02.10.2026 за метр/м², остальное примерно ---------- */
   function mat(id, name, kind, dims, price, priceMode, extra) {
     var m = { id: id, name: name, kind: kind, dims: dims || {}, price: price, priceMode: priceMode || 'unit', unit: unitOf(kind) || 'шт' };
     if (extra) for (var k in extra) m[k] = extra[k];
@@ -452,20 +465,18 @@
   }
 
   var DEFAULT_MATERIALS = [
-    mat('p20x20x2', 'Профтруба 20×20×2', 'square', { a: 20, t: 2 }, 420, 'kg'),
-    mat('p40x20x2', 'Профтруба 40×20×2', 'rect', { a: 40, b: 20, t: 2 }, 420, 'kg'),
-    mat('p40x40x2', 'Профтруба 40×40×2', 'square', { a: 40, t: 2 }, 420, 'kg'),
-    mat('p60x40x2', 'Профтруба 60×40×2', 'rect', { a: 60, b: 40, t: 2 }, 420, 'kg'),
-    mat('p60x60x3', 'Профтруба 60×60×3', 'square', { a: 60, t: 3 }, 420, 'kg'),
-    mat('p80x80x3', 'Профтруба 80×80×3', 'square', { a: 80, t: 3 }, 420, 'kg'),
-    mat('p100x100x4', 'Профтруба 100×100×4', 'square', { a: 100, t: 4 }, 430, 'kg'),
-    mat('r57x3', 'Труба круглая 57×3', 'round', { d: 57, t: 3 }, 430, 'kg'),
-    mat('r108x4', 'Труба круглая 108×4', 'round', { d: 108, t: 4 }, 430, 'kg'),
-    mat('ug50x5', 'Уголок 50×50×5', 'angle', { a: 50, b: 50, t: 5 }, 410, 'kg'),
-    mat('sheet2', 'Лист 2 мм', 'sheet', { t: 2 }, 440, 'kg'),
-    mat('sheet3', 'Лист 3 мм', 'sheet', { t: 3 }, 440, 'kg'),
-    mat('arm12', 'Арматура Ø12', 'rod', { d: 12 }, 380, 'kg'),
-    mat('prof045', 'Профнастил С8 0,45', 'custom', {}, 2900, 'unit', { unit: 'м²', kgPerUnit: 4.6 }),
+    mat('p20x20x2', 'Профтруба 20×20×2', 'square', { a: 20, t: 2 }, 510, 'unit'),
+    mat('p40x20x2', 'Профтруба 40×20×2', 'rect', { a: 40, b: 20, t: 2 }, 765, 'unit'),
+    mat('p40x40x2', 'Профтруба 40×40×2', 'square', { a: 40, t: 2 }, 1045, 'unit'),
+    mat('p60x40x2', 'Профтруба 60×40×2', 'rect', { a: 60, b: 40, t: 2 }, 1345, 'unit'),
+    mat('p60x60x3', 'Профтруба 60×60×3', 'square', { a: 60, t: 3 }, 2530, 'unit'),
+    mat('p80x80x3', 'Профтруба 80×80×3', 'square', { a: 80, t: 3 }, 3195, 'unit'),
+    mat('r108x35', 'Труба 108×3,5', 'round', { d: 108, t: 3.5 }, 4365, 'unit', { stockLen: 12 }),
+    mat('ug50x5', 'Уголок 50×50×5', 'angle', { a: 50, b: 50, t: 5 }, 1457, 'unit'),
+    mat('sheet2', 'Лист г/к 2 мм (1,25×2,5)', 'sheet', { t: 2 }, 7208, 'unit'),
+    mat('sheet3', 'Лист г/к 3 мм (1,25×2,5)', 'sheet', { t: 3 }, 9733, 'unit'),
+    mat('arm12', 'Арматура А500 ф12', 'rod', { d: 12 }, 375, 'unit', { stockLen: 11.75 }),
+    mat('prof045', 'Профлист полимер 0,45 (1,05×6)', 'custom', {}, 2889, 'unit', { unit: 'м²', kgPerUnit: 4.4 }),
     mat('hinge', 'Петля гаражная', 'custom', {}, 1500, 'unit', { unit: 'шт', kgPerUnit: 0.4 }),
     mat('lock', 'Замок врезной', 'custom', {}, 9000, 'unit', { unit: 'шт', kgPerUnit: 0 }),
     mat('anchor', 'Анкер / закладная', 'custom', {}, 600, 'unit', { unit: 'шт', kgPerUnit: 0.3 })
@@ -492,6 +503,7 @@
       { name: 'Амортизация оборудования', amount: 50000 }
     ],
     stockLen: 6,
+    wholeBars: true,
     kerfMm: 3,
     company: 'Мой цех',
     phone: '',
@@ -552,7 +564,7 @@
     kgPerUnit: kgPerUnit, materialKg: materialKg, unitPrice: unitPrice, unitOf: unitOf,
     evalFormula: evalFormula, tryFormula: tryFormula, paramVars: paramVars,
     calcItem: calcItem, calcOrder: calcOrder, overheadPerKg: overheadPerKg,
-    hasCut: hasCut, partQty: partQty, cutPlan: cutPlan, orderCutPlans: orderCutPlans, allocatePrice: allocatePrice,
+    hasCut: hasCut, isBar: isBar, partQty: partQty, cutPlan: cutPlan, orderCutPlans: orderCutPlans, allocatePrice: allocatePrice,
     CATEGORIES: CATEGORIES, CAT: CAT, taxByMonth: taxByMonth, yearIncome: yearIncome, factByOrder: factByOrder, planVsFact: planVsFact, suggestCoefficients: suggestCoefficients,
     fmtNum: fmtNum, roundTo: roundTo,
     DEFAULT_MATERIALS: DEFAULT_MATERIALS, DEFAULT_SETTINGS: DEFAULT_SETTINGS, DEFAULT_TEMPLATES: DEFAULT_TEMPLATES

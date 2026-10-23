@@ -1,0 +1,1815 @@
+{
+"supplier": "IMEX Trade",
+"priceDate": "2026-10-05",
+"notes": "Нержавейка, цены с НДС (ценовая группа «Партнер Алматы»). Трубы — хлыст 6 м, пруток 4 м; цена за метр = цена хлыста / длина. Лист — цена за м².",
+"items": [
+{
+"name": "Анкер AISI304 М8*80",
+"price_pc": 126.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 126.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-76df8cc9"
+},
+{
+"name": "Анкер фикс М8*50 с болтом",
+"price_pc": 104.0,
+"unit_src": "штука",
+"kind": "custom",
+"dims": {},
+"price": 104.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-a7e35634"
+},
+{
+"name": "Болгарка d100",
+"price_pc": 18341.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 18341.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-34ebfdbd"
+},
+{
+"name": "Вольфрам 1,6 (упаковка 10шт.)",
+"price_pc": 9680.0,
+"unit_src": "Пачка",
+"kind": "custom",
+"dims": {},
+"price": 9680.0,
+"unit": "пачка",
+"kgPerUnit": 0,
+"id": "imx-e71a58c4"
+},
+{
+"name": "Вольфрам 2,0 (упаковка 10шт.)",
+"price_pc": 20250.0,
+"unit_src": "Пачка",
+"kind": "custom",
+"dims": {},
+"price": 20250.0,
+"unit": "пачка",
+"kgPerUnit": 0,
+"id": "imx-31e1e307"
+},
+{
+"name": "Заглушка AISI201 d15,9*1 mm",
+"price_pc": 50.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 50.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-89d3b3a0"
+},
+{
+"name": "Заглушка AISI201 d38,1*1 mm",
+"price_pc": 59.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 59.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-e1be10ff"
+},
+{
+"name": "Заглушка AISI201 d50,8*1 mm",
+"price_pc": 67.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 67.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-23f8fc26"
+},
+{
+"name": "Заглушка AISI304 d15,9*0,7 mm",
+"price_pc": 68.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 68.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-0b94c26e"
+},
+{
+"name": "Заглушка AISI304 d38,1*0,7 mm",
+"price_pc": 102.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 102.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-b36dd846"
+},
+{
+"name": "Заглушка AISI304 d50,8*0,7 mm",
+"price_pc": 116.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 116.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-9dc71671"
+},
+{
+"name": "Заглушка сварная AISI201 d15,9*1,35 mm",
+"price_pc": 45.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 45.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-8ee7c798"
+},
+{
+"name": "Заглушка сварная AISI201 d19,0*1,35 mm",
+"price_pc": 49.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 49.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-81bb418b"
+},
+{
+"name": "Заглушка сварная AISI201 d25,0*1,35 mm",
+"price_pc": 56.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 56.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-80b01da8"
+},
+{
+"name": "Заглушка сварная AISI201 d31,8*1,35 mm",
+"price_pc": 59.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 59.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-278d4f71"
+},
+{
+"name": "Заглушка сварная AISI201 d38,1*1,35 mm",
+"price_pc": 65.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 65.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-fea135b2"
+},
+{
+"name": "Заглушка сварная AISI201 d50,8*1,35 mm",
+"price_pc": 107.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 107.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-e4251dd8"
+},
+{
+"name": "Заглушка сварная AISI304 d15,9*1,2 mm",
+"price_pc": 68.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 68.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-2f96e4a3"
+},
+{
+"name": "Заглушка сварная AISI304 d38,1*1,2 mm",
+"price_pc": 104.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 104.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-a049c808"
+},
+{
+"name": "Заглушка сварная AISI304 d50,8*1,2 mm",
+"price_pc": 140.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 140.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-8219ba77"
+},
+{
+"name": "Колпачковая шайба AISI201 М12",
+"price_pc": 266.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 266.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-7e547466"
+},
+{
+"name": "Круг/Прут AISI201 d10*4000 (шт.)",
+"price_pc": 4155.0,
+"unit_src": "шт",
+"kind": "rod",
+"dims": {
+"d": 10.0
+},
+"stockLen": 4,
+"price": 1038.75,
+"unit": "м",
+"id": "imx-1c81188f"
+},
+{
+"name": "Круг/Прут AISI201 d4*4000 (шт.)",
+"price_pc": 943.0,
+"unit_src": "шт",
+"kind": "rod",
+"dims": {
+"d": 4.0
+},
+"stockLen": 4,
+"price": 235.75,
+"unit": "м",
+"id": "imx-00c900f2"
+},
+{
+"name": "Круг/Прут AISI201 d6*4000 (шт.)",
+"price_pc": 1808.0,
+"unit_src": "шт",
+"kind": "rod",
+"dims": {
+"d": 6.0
+},
+"stockLen": 4,
+"price": 452.0,
+"unit": "м",
+"id": "imx-75508e62"
+},
+{
+"name": "Круг/Прут AISI201 d8*4000 (шт.)",
+"price_pc": 2681.0,
+"unit_src": "шт",
+"kind": "rod",
+"dims": {
+"d": 8.0
+},
+"stockLen": 4,
+"price": 670.25,
+"unit": "м",
+"id": "imx-4b7a1da4"
+},
+{
+"name": "Лист AISI201 1,25*2,50*0,5 mm 4N+PE",
+"price_pc": 15665.0,
+"unit_src": "шт",
+"kind": "sheet",
+"dims": {
+"t": 0.5
+},
+"price": 5012.8,
+"unit": "м²",
+"sheet": "1.25×2.5",
+"id": "imx-1a7c594f"
+},
+{
+"name": "Лист AISI201 1,25*2,50*0,8 mm 4N+PE",
+"price_pc": 28303.0,
+"unit_src": "шт",
+"kind": "sheet",
+"dims": {
+"t": 0.8
+},
+"price": 9056.96,
+"unit": "м²",
+"sheet": "1.25×2.5",
+"id": "imx-c0b2917d"
+},
+{
+"name": "Лист AISI201 1,25*2,50*1,2 mm 2B",
+"price_pc": 40120.0,
+"unit_src": "шт",
+"kind": "sheet",
+"dims": {
+"t": 1.2
+},
+"price": 12838.4,
+"unit": "м²",
+"sheet": "1.25×2.5",
+"id": "imx-4f5d4df4"
+},
+{
+"name": "Лист AISI201 1,25*2,50*1,5 mm 2B",
+"price_pc": 44572.0,
+"unit_src": "шт",
+"kind": "sheet",
+"dims": {
+"t": 1.5
+},
+"price": 14263.04,
+"unit": "м²",
+"sheet": "1.25×2.5",
+"id": "imx-fdd0e654"
+},
+{
+"name": "Лист AISI430 1,00*2,00*0,4 mm BA+PE",
+"price_pc": 6700.0,
+"unit_src": "шт",
+"kind": "sheet",
+"dims": {
+"t": 0.4
+},
+"price": 3350.0,
+"unit": "м²",
+"sheet": "1.0×2.0",
+"id": "imx-662a245d"
+},
+{
+"name": "Лист AISI430 1,00*2,00*0,5 mm 4N+PE",
+"price_pc": 12997.0,
+"unit_src": "шт",
+"kind": "sheet",
+"dims": {
+"t": 0.5
+},
+"price": 6498.5,
+"unit": "м²",
+"sheet": "1.0×2.0",
+"id": "imx-4fbbf15b"
+},
+{
+"name": "Лист AISI430 1,00*2,00*0,8 mm 4N+PE",
+"price_pc": 13000.0,
+"unit_src": "шт",
+"kind": "sheet",
+"dims": {
+"t": 0.8
+},
+"price": 6500.0,
+"unit": "м²",
+"sheet": "1.0×2.0",
+"id": "imx-42f0b9d7"
+},
+{
+"name": "Лист AISI430 1,00*2,00*1,0 mm 4N+PE",
+"price_pc": 15944.0,
+"unit_src": "шт",
+"kind": "sheet",
+"dims": {
+"t": 1.0
+},
+"price": 7972.0,
+"unit": "м²",
+"sheet": "1.0×2.0",
+"id": "imx-bc217789"
+},
+{
+"name": "Лист AISI430 1,25*2,50*0,4 mm 4N+PE",
+"price_pc": 15778.0,
+"unit_src": "шт",
+"kind": "sheet",
+"dims": {
+"t": 0.4
+},
+"price": 5048.96,
+"unit": "м²",
+"sheet": "1.25×2.5",
+"id": "imx-1f7da21b"
+},
+{
+"name": "Лист AISI430 1,25*2,50*0,5 mm 4N+PE",
+"price_pc": 17906.0,
+"unit_src": "шт",
+"kind": "sheet",
+"dims": {
+"t": 0.5
+},
+"price": 5729.92,
+"unit": "м²",
+"sheet": "1.25×2.5",
+"id": "imx-f030d870"
+},
+{
+"name": "Лист AISI430 1,25*2,50*0,6 mm 4N+PE",
+"price_pc": 21539.0,
+"unit_src": "шт",
+"kind": "sheet",
+"dims": {
+"t": 0.6
+},
+"price": 6892.48,
+"unit": "м²",
+"sheet": "1.25×2.5",
+"id": "imx-941e853c"
+},
+{
+"name": "Лист AISI430 1,25*2,50*0,7 mm 4N+PE",
+"price_pc": 24078.0,
+"unit_src": "шт",
+"kind": "sheet",
+"dims": {
+"t": 0.7
+},
+"price": 7704.96,
+"unit": "м²",
+"sheet": "1.25×2.5",
+"id": "imx-5a28819f"
+},
+{
+"name": "Лист AISI430 1,25*2,50*0,8 mm 4N+PE",
+"price_pc": 27814.0,
+"unit_src": "шт",
+"kind": "sheet",
+"dims": {
+"t": 0.8
+},
+"price": 8900.48,
+"unit": "м²",
+"sheet": "1.25×2.5",
+"id": "imx-6cd88e65"
+},
+{
+"name": "Лист AISI430 1,25*2,50*1,0 mm 4N+PE",
+"price_pc": 33491.0,
+"unit_src": "шт",
+"kind": "sheet",
+"dims": {
+"t": 1.0
+},
+"price": 10717.12,
+"unit": "м²",
+"sheet": "1.25×2.5",
+"id": "imx-ce025041"
+},
+{
+"name": "Лист AISI430 1,25*2,50*1,2 mm 4N+PE",
+"price_pc": 36762.0,
+"unit_src": "шт",
+"kind": "sheet",
+"dims": {
+"t": 1.2
+},
+"price": 11763.84,
+"unit": "м²",
+"sheet": "1.25×2.5",
+"id": "imx-227b71ae"
+},
+{
+"name": "Лист AISI430 1,50*3,00*0,8 mm 4N+PE",
+"price_pc": 35588.0,
+"unit_src": "шт",
+"kind": "sheet",
+"dims": {
+"t": 0.8
+},
+"price": 7908.44,
+"unit": "м²",
+"sheet": "1.5×3.0",
+"id": "imx-59b62914"
+},
+{
+"name": "Лист AISI430 1,50*3,00*1,0 mm 4N+PE",
+"price_pc": 48813.0,
+"unit_src": "шт",
+"kind": "sheet",
+"dims": {
+"t": 1.0
+},
+"price": 10847.33,
+"unit": "м²",
+"sheet": "1.5×3.0",
+"id": "imx-83db6342"
+},
+{
+"name": "Лист Золотой нерж AISI201 1,22*2,44*0,4 mm 8K+ PE",
+"price_pc": 19994.0,
+"unit_src": "шт",
+"kind": "sheet",
+"dims": {
+"t": 0.4
+},
+"price": 6716.61,
+"unit": "м²",
+"sheet": "1.22×2.44",
+"id": "imx-a4b0bda8"
+},
+{
+"name": "Микрометр игольчатый",
+"price_pc": 12194.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 12194.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-0fda4462"
+},
+{
+"name": "Наждачный диск 320 d100",
+"price_pc": 223.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 223.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-e532a427"
+},
+{
+"name": "Наждачный диск 320 d100 пластиковый Белый",
+"price_pc": 237.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 237.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-08b2806e"
+},
+{
+"name": "Наждачный диск 80 d100",
+"price_pc": 223.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 223.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-d030e8f5"
+},
+{
+"name": "Наждачный диск 80 d100 пластиковый Белый",
+"price_pc": 237.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 237.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-f7461b06"
+},
+{
+"name": "Ножка мебельная Евро PE 38*38/40*40",
+"price_pc": 435.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 435.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-ad0d6b36"
+},
+{
+"name": "Ножка мебельная Стандарт PE 38*38/40*40",
+"price_pc": 141.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 141.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-c25b9e91"
+},
+{
+"name": "Полировальная паста PASG 999 белая 750 гр (Аксессуары из нержавеющей стали)",
+"price_pc": 3916.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 3916.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-1583d0ee"
+},
+{
+"name": "Полировальный диск Cерый d100",
+"price_pc": 220.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 220.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-4693c928"
+},
+{
+"name": "Полировальный диск войлок Белый d90",
+"price_pc": 212.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 212.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-396c59af"
+},
+{
+"name": "Полумесяц AISI201 d150*0,5mm",
+"price_pc": 794.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 794.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-d529db40"
+},
+{
+"name": "Полумесяц AISI201 d200*0,5mm",
+"price_pc": 1027.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 1027.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-5a96a04e"
+},
+{
+"name": "Полумесяц AISI201 d250*0,5mm",
+"price_pc": 1564.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 1564.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-27df3d61"
+},
+{
+"name": "Полумесяц AISI201 d300*0,5mm",
+"price_pc": 1704.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 1704.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-492455e0"
+},
+{
+"name": "Полумесяц Золотой AISI201 d150*0,5mm",
+"price_pc": 857.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 857.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-c07b8358"
+},
+{
+"name": "Полумесяц Золотой AISI201 d200*0,5mm",
+"price_pc": 1145.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 1145.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-7e991117"
+},
+{
+"name": "Присадочная проволока AISI201-1,5 mm",
+"price_pc": 2453.0,
+"unit_src": "кг",
+"kind": "custom",
+"dims": {},
+"price": 2453.0,
+"unit": "кг",
+"kgPerUnit": 1,
+"id": "imx-383ca159"
+},
+{
+"name": "Присадочная проволока AISI201-2,0 mm",
+"price_pc": 2453.0,
+"unit_src": "кг",
+"kind": "custom",
+"dims": {},
+"price": 2453.0,
+"unit": "кг",
+"kgPerUnit": 1,
+"id": "imx-20fc3f79"
+},
+{
+"name": "Присадочная проволока AISI304-1,5 mm",
+"price_pc": 3363.0,
+"unit_src": "кг",
+"kind": "custom",
+"dims": {},
+"price": 3363.0,
+"unit": "кг",
+"kgPerUnit": 1,
+"id": "imx-8d373ca2"
+},
+{
+"name": "Присадочная проволока AISI304-2,0 mm",
+"price_pc": 3363.0,
+"unit_src": "кг",
+"kind": "custom",
+"dims": {},
+"price": 3363.0,
+"unit": "кг",
+"kgPerUnit": 1,
+"id": "imx-68479955"
+},
+{
+"name": "Соединитель трубы AISI201 d15,9*1,0 mm",
+"price_pc": 128.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 128.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-052f8da3"
+},
+{
+"name": "Соединитель трубы AISI201 d19,0*1,0 mm",
+"price_pc": 118.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 118.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-79225de5"
+},
+{
+"name": "Соединитель трубы AISI201 d25,0*1,0 mm",
+"price_pc": 141.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 141.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-70894151"
+},
+{
+"name": "Соединитель трубы AISI201 d31,8*1,0 mm",
+"price_pc": 195.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 195.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-41ea9cfe"
+},
+{
+"name": "Соединитель трубы AISI201 d38,1*1,2 mm",
+"price_pc": 268.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 268.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-9a291a1f"
+},
+{
+"name": "Соединитель трубы AISI201 d50,8*1,2 mm",
+"price_pc": 401.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 401.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-05981780"
+},
+{
+"name": "Соединитель трубы AISI201 d63,0*1,5 mm",
+"price_pc": 760.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 760.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-a6c14362"
+},
+{
+"name": "Соединитель трубы AISI304 d38,1*1,2 mm",
+"price_pc": 409.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 409.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-6a382ac9"
+},
+{
+"name": "Соединитель трубы AISI304 d50,8*1,2 mm",
+"price_pc": 573.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 573.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-c8c3e30a"
+},
+{
+"name": "Стеклодержатель под круг AISI201 63*40 mm",
+"price_pc": 548.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 548.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-7ce3b7fe"
+},
+{
+"name": "Труба AISI201 d101,6*1,5*6000 (шт.)",
+"price_pc": 38748.0,
+"unit_src": "шт",
+"kind": "round",
+"dims": {
+"d": 101.6,
+"t": 1.5
+},
+"stockLen": 6,
+"price": 6458.0,
+"unit": "м",
+"id": "imx-a0992319"
+},
+{
+"name": "Труба AISI201 d101,6*2,0*6000 (шт.) (1,8)",
+"price_pc": 47829.0,
+"unit_src": "шт",
+"kind": "round",
+"dims": {
+"d": 101.6,
+"t": 1.8
+},
+"stockLen": 6,
+"price": 7971.5,
+"unit": "м",
+"id": "imx-908bcea2"
+},
+{
+"name": "Труба AISI201 d12,0*0,8*6000 (шт.)",
+"price_pc": 1875.0,
+"unit_src": "шт",
+"kind": "round",
+"dims": {
+"d": 12.0,
+"t": 0.8
+},
+"stockLen": 6,
+"price": 312.5,
+"unit": "м",
+"id": "imx-78324282"
+},
+{
+"name": "Труба AISI201 d15,9*0,7*6000 (шт.)",
+"price_pc": 2189.0,
+"unit_src": "шт",
+"kind": "round",
+"dims": {
+"d": 15.9,
+"t": 0.7
+},
+"stockLen": 6,
+"price": 364.83,
+"unit": "м",
+"id": "imx-99c10d46"
+},
+{
+"name": "Труба AISI201 d15,9*0,8*6000 (шт.)",
+"price_pc": 2374.0,
+"unit_src": "шт",
+"kind": "round",
+"dims": {
+"d": 15.9,
+"t": 0.8
+},
+"stockLen": 6,
+"price": 395.67,
+"unit": "м",
+"id": "imx-2e6333ef"
+},
+{
+"name": "Труба AISI201 d15,9*0,9*6000 (шт.)",
+"price_pc": 2998.0,
+"unit_src": "шт",
+"kind": "round",
+"dims": {
+"d": 15.9,
+"t": 0.9
+},
+"stockLen": 6,
+"price": 499.67,
+"unit": "м",
+"id": "imx-a98d6e3f"
+},
+{
+"name": "Труба AISI201 d15,9*1,2*6000 (шт.)",
+"price_pc": 3521.0,
+"unit_src": "шт",
+"kind": "round",
+"dims": {
+"d": 15.9,
+"t": 1.2
+},
+"stockLen": 6,
+"price": 586.83,
+"unit": "м",
+"id": "imx-f99091fc"
+},
+{
+"name": "Труба AISI201 d15,9*1,2*6000 (шт.) (1,1)",
+"price_pc": 3380.0,
+"unit_src": "шт",
+"kind": "round",
+"dims": {
+"d": 15.9,
+"t": 1.1
+},
+"stockLen": 6,
+"price": 563.33,
+"unit": "м",
+"id": "imx-0864352d"
+},
+{
+"name": "Труба AISI201 d19,0*0,7*6000 (шт.)",
+"price_pc": 2160.0,
+"unit_src": "шт",
+"kind": "round",
+"dims": {
+"d": 19.0,
+"t": 0.7
+},
+"stockLen": 6,
+"price": 360.0,
+"unit": "м",
+"id": "imx-ec429e96"
+},
+{
+"name": "Труба AISI201 d25,0*0,8*6000 (шт.)",
+"price_pc": 3890.0,
+"unit_src": "шт",
+"kind": "round",
+"dims": {
+"d": 25.0,
+"t": 0.8
+},
+"stockLen": 6,
+"price": 648.33,
+"unit": "м",
+"id": "imx-2b7f7d99"
+},
+{
+"name": "Труба AISI201 d25,0*0,9*6000 (шт.)",
+"price_pc": 4499.0,
+"unit_src": "шт",
+"kind": "round",
+"dims": {
+"d": 25.0,
+"t": 0.9
+},
+"stockLen": 6,
+"price": 749.83,
+"unit": "м",
+"id": "imx-e03d3b19"
+},
+{
+"name": "Труба AISI201 d31,8*0,8*6000 (шт.)",
+"price_pc": 4188.0,
+"unit_src": "шт",
+"kind": "round",
+"dims": {
+"d": 31.8,
+"t": 0.8
+},
+"stockLen": 6,
+"price": 698.0,
+"unit": "м",
+"id": "imx-7d2cdc88"
+},
+{
+"name": "Труба AISI201 d31,8*0,9*6000 (шт.)",
+"price_pc": 5160.0,
+"unit_src": "шт",
+"kind": "round",
+"dims": {
+"d": 31.8,
+"t": 0.9
+},
+"stockLen": 6,
+"price": 860.0,
+"unit": "м",
+"id": "imx-118ddf55"
+},
+{
+"name": "Труба AISI201 d38,1*0,7*6000 (шт.)",
+"price_pc": 5288.0,
+"unit_src": "шт",
+"kind": "round",
+"dims": {
+"d": 38.1,
+"t": 0.7
+},
+"stockLen": 6,
+"price": 881.33,
+"unit": "м",
+"id": "imx-2d21a55a"
+},
+{
+"name": "Труба AISI201 d38,1*0,8*6000 (шт.)",
+"price_pc": 6267.0,
+"unit_src": "шт",
+"kind": "round",
+"dims": {
+"d": 38.1,
+"t": 0.8
+},
+"stockLen": 6,
+"price": 1044.5,
+"unit": "м",
+"id": "imx-3c14156f"
+},
+{
+"name": "Труба AISI201 d38,1*0,9*6000 (шт.)",
+"price_pc": 7730.0,
+"unit_src": "шт",
+"kind": "round",
+"dims": {
+"d": 38.1,
+"t": 0.9
+},
+"stockLen": 6,
+"price": 1288.33,
+"unit": "м",
+"id": "imx-c1217b58"
+},
+{
+"name": "Труба AISI201 d38,1*1,2*6000 (шт.)",
+"price_pc": 9300.0,
+"unit_src": "шт",
+"kind": "round",
+"dims": {
+"d": 38.1,
+"t": 1.2
+},
+"stockLen": 6,
+"price": 1550.0,
+"unit": "м",
+"id": "imx-c870d965"
+},
+{
+"name": "Труба AISI201 d50,8*0,7*6000 (шт.)",
+"price_pc": 6010.0,
+"unit_src": "шт",
+"kind": "round",
+"dims": {
+"d": 50.8,
+"t": 0.7
+},
+"stockLen": 6,
+"price": 1001.67,
+"unit": "м",
+"id": "imx-e9730d2e"
+},
+{
+"name": "Труба AISI201 d50,8*0,8*6000 (шт.)",
+"price_pc": 7620.0,
+"unit_src": "шт",
+"kind": "round",
+"dims": {
+"d": 50.8,
+"t": 0.8
+},
+"stockLen": 6,
+"price": 1270.0,
+"unit": "м",
+"id": "imx-618f6227"
+},
+{
+"name": "Труба AISI201 d50,8*0,9*6000 (шт.)",
+"price_pc": 10570.0,
+"unit_src": "шт",
+"kind": "round",
+"dims": {
+"d": 50.8,
+"t": 0.9
+},
+"stockLen": 6,
+"price": 1761.67,
+"unit": "м",
+"id": "imx-494c1bc0"
+},
+{
+"name": "Труба AISI201 d50,8*1,2*6000 (шт.)",
+"price_pc": 13098.0,
+"unit_src": "шт",
+"kind": "round",
+"dims": {
+"d": 50.8,
+"t": 1.2
+},
+"stockLen": 6,
+"price": 2183.0,
+"unit": "м",
+"id": "imx-77c8d9a4"
+},
+{
+"name": "Труба AISI201 d63,0*1,5*6000 (шт.)",
+"price_pc": 20315.0,
+"unit_src": "шт",
+"kind": "round",
+"dims": {
+"d": 63.0,
+"t": 1.5
+},
+"stockLen": 6,
+"price": 3385.83,
+"unit": "м",
+"id": "imx-33d465f2"
+},
+{
+"name": "Труба AISI304 d15,9*0,9*6000 (шт.)",
+"price_pc": 4727.0,
+"unit_src": "шт",
+"kind": "round",
+"dims": {
+"d": 15.9,
+"t": 0.9
+},
+"stockLen": 6,
+"price": 787.83,
+"unit": "м",
+"id": "imx-7b67d711"
+},
+{
+"name": "Труба AISI304 d38,1*0,9*6000 (шт.)",
+"price_pc": 12212.0,
+"unit_src": "шт",
+"kind": "round",
+"dims": {
+"d": 38.1,
+"t": 0.9
+},
+"stockLen": 6,
+"price": 2035.33,
+"unit": "м",
+"id": "imx-6d37e7fc"
+},
+{
+"name": "Труба AISI304 d50,8*0,9*6000 (шт.)",
+"price_pc": 16861.0,
+"unit_src": "шт",
+"kind": "round",
+"dims": {
+"d": 50.8,
+"t": 0.9
+},
+"stockLen": 6,
+"price": 2810.17,
+"unit": "м",
+"id": "imx-d0af11e6"
+},
+{
+"name": "Труба нерж AISI201 d19*19*0,8*6000 (шт.)",
+"price_pc": 4152.0,
+"unit_src": "шт",
+"kind": "square",
+"dims": {
+"a": 19.0,
+"t": 0.8
+},
+"stockLen": 6,
+"price": 692.0,
+"unit": "м",
+"id": "imx-b8a494e7"
+},
+{
+"name": "Труба нерж AISI201 d25*25*0,8*6000 (шт.)",
+"price_pc": 5960.0,
+"unit_src": "шт",
+"kind": "square",
+"dims": {
+"a": 25.0,
+"t": 0.8
+},
+"stockLen": 6,
+"price": 993.33,
+"unit": "м",
+"id": "imx-9a95ad8d"
+},
+{
+"name": "Труба нерж AISI201 d25*25*1,0*6000 (шт.)",
+"price_pc": 5474.0,
+"unit_src": "шт",
+"kind": "square",
+"dims": {
+"a": 25.0,
+"t": 1.0
+},
+"stockLen": 6,
+"price": 912.33,
+"unit": "м",
+"id": "imx-897ed27e"
+},
+{
+"name": "Труба нерж AISI201 d25*25*1,2*6000 (шт.)",
+"price_pc": 8155.0,
+"unit_src": "шт",
+"kind": "square",
+"dims": {
+"a": 25.0,
+"t": 1.2
+},
+"stockLen": 6,
+"price": 1359.17,
+"unit": "м",
+"id": "imx-f2940d61"
+},
+{
+"name": "Труба нерж AISI201 d30*15*0,8*6000 (шт.)",
+"price_pc": 5254.0,
+"unit_src": "шт",
+"kind": "rect",
+"dims": {
+"a": 30.0,
+"b": 15.0,
+"t": 0.8
+},
+"stockLen": 6,
+"price": 875.67,
+"unit": "м",
+"id": "imx-0ac08e82"
+},
+{
+"name": "Труба нерж AISI201 d30*30*1,0*6000 (шт.)",
+"price_pc": 8278.0,
+"unit_src": "шт",
+"kind": "square",
+"dims": {
+"a": 30.0,
+"t": 1.0
+},
+"stockLen": 6,
+"price": 1379.67,
+"unit": "м",
+"id": "imx-dd04637c"
+},
+{
+"name": "Труба нерж AISI201 d38*19*0,8*6000 Satin (шт.)",
+"price_pc": 6349.0,
+"unit_src": "шт",
+"kind": "rect",
+"dims": {
+"a": 38.0,
+"b": 19.0,
+"t": 0.8
+},
+"stockLen": 6,
+"price": 1058.17,
+"unit": "м",
+"id": "imx-b9d3ed20"
+},
+{
+"name": "Труба нерж AISI201 d38*38*0,8*6000 Satin (шт.)",
+"price_pc": 9275.0,
+"unit_src": "шт",
+"kind": "square",
+"dims": {
+"a": 38.0,
+"t": 0.8
+},
+"stockLen": 6,
+"price": 1545.83,
+"unit": "м",
+"id": "imx-9337c328"
+},
+{
+"name": "Труба нерж AISI201 d38*38*0,9*6000 (шт.)",
+"price_pc": 8624.0,
+"unit_src": "шт",
+"kind": "square",
+"dims": {
+"a": 38.0,
+"t": 0.9
+},
+"stockLen": 6,
+"price": 1437.33,
+"unit": "м",
+"id": "imx-5e428f8a"
+},
+{
+"name": "Труба нерж AISI201 d38*38*1,0*6000 Satin (шт.)",
+"price_pc": 10994.0,
+"unit_src": "шт",
+"kind": "square",
+"dims": {
+"a": 38.0,
+"t": 1.0
+},
+"stockLen": 6,
+"price": 1832.33,
+"unit": "м",
+"id": "imx-3097457f"
+},
+{
+"name": "Труба нерж AISI201 d40*20*1,0*6000 Satin (шт.)",
+"price_pc": 8644.0,
+"unit_src": "шт",
+"kind": "rect",
+"dims": {
+"a": 40.0,
+"b": 20.0,
+"t": 1.0
+},
+"stockLen": 6,
+"price": 1440.67,
+"unit": "м",
+"id": "imx-3b5cf02b"
+},
+{
+"name": "Труба нерж AISI201 d40*40*1,0*6000 Satin (шт.)",
+"price_pc": 10557.0,
+"unit_src": "шт",
+"kind": "square",
+"dims": {
+"a": 40.0,
+"t": 1.0
+},
+"stockLen": 6,
+"price": 1759.5,
+"unit": "м",
+"id": "imx-ed23b330"
+},
+{
+"name": "Флянец AISI201-D38,3; OD76*2,7mm",
+"price_pc": 280.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 280.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-de74994c"
+},
+{
+"name": "Флянец AISI304-D38,3; OD76*2,7mm",
+"price_pc": 447.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 447.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-9338bdd9"
+},
+{
+"name": "Флянец AISI304-D51,0; OD76*2,7mm",
+"price_pc": 447.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 447.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-32478f88"
+},
+{
+"name": "Флянец d32,0 OD85 ч/м",
+"price_pc": 259.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 259.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-d87afddc"
+},
+{
+"name": "Флянец d38,3 OD85 ч/м",
+"price_pc": 284.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 284.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-9403ab0c"
+},
+{
+"name": "Флянец d51,0 OD85 ч/м",
+"price_pc": 284.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 284.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-70098c54"
+},
+{
+"name": "Чашка стойки AISI201 d16,1*L30*1mm",
+"price_pc": 121.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 121.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-db86baa4"
+},
+{
+"name": "Чашка стойки AISI201 d16,1*L90*1mm",
+"price_pc": 121.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 121.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-42f2126a"
+},
+{
+"name": "Чашка стойки AISI201 d25,2*L30*1mm",
+"price_pc": 122.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 122.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-8aea0d6c"
+},
+{
+"name": "Чашка стойки AISI201 d25,2*L90*1mm",
+"price_pc": 99.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 99.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-7d10d924"
+},
+{
+"name": "Чашка стойки AISI201 d32,0*L30*1mm",
+"price_pc": 179.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 179.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-6c844c19"
+},
+{
+"name": "Чашка стойки AISI201 d32,0*L90*1mm",
+"price_pc": 179.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 179.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-8aedb5c9"
+},
+{
+"name": "Чашка стойки AISI304 d38,3*L30*1mm",
+"price_pc": 201.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 201.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-67e441c3"
+},
+{
+"name": "Чашка стойки AISI304 d38,3*L90*1mm",
+"price_pc": 201.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 201.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-9ef91066"
+},
+{
+"name": "Чашка стойки AISI304 d51,0*L30*1mm",
+"price_pc": 214.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 214.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-5d27ca2a"
+},
+{
+"name": "Чашка стойки AISI304 d51,0*L90*1mm",
+"price_pc": 214.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 214.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-2ef8398a"
+},
+{
+"name": "Чашка стойки HIGH AISI201 d38,3*L30*0.8mm",
+"price_pc": 203.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 203.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-063abb9a"
+},
+{
+"name": "Чашка стойки HIGH AISI201 d38,3*L90*0.8mm",
+"price_pc": 203.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 203.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-aa66c1ab"
+},
+{
+"name": "Чашка стойки HIGH AISI201 d51,0*L30*1mm",
+"price_pc": 293.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 293.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-288eca88"
+},
+{
+"name": "Чашка стойки HIGH AISI201 d51,0*L90*1mm",
+"price_pc": 293.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 293.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-fe8cf6dc"
+},
+{
+"name": "Чашка сферы AISI201 d16,1*0,5 mm OD70 new",
+"price_pc": 91.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 91.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-0ca2395a"
+},
+{
+"name": "Чашка сферы AISI201 d25,2*0,5 mm OD70 new",
+"price_pc": 86.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 86.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-64ae395c"
+},
+{
+"name": "Чашка сферы AISI201 d32,0*0,5 mm OD90 new",
+"price_pc": 117.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 117.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-19268ce6"
+},
+{
+"name": "Чашка сферы AISI201 d38,3*0,5 mm OD90 new",
+"price_pc": 117.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 117.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-34c1d8ba"
+},
+{
+"name": "Чашка сферы AISI201 d51,0*0,5 mm OD90 new",
+"price_pc": 117.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 117.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-ae49c2d7"
+},
+{
+"name": "Чашка сферы AISI201 d63,0*0,5 mm OD90 new",
+"price_pc": 148.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 148.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-b3150a0c"
+},
+{
+"name": "Чашка сферы AISI304 d51,0*0,5 mm OD90 new",
+"price_pc": 192.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 192.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-5f28a2da"
+},
+{
+"name": "Шар AISI201d100*0.5mm",
+"price_pc": 365.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 365.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-6cc5e7e1"
+},
+{
+"name": "Шар AISI201d120*0.5mm",
+"price_pc": 592.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 592.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-42d7996a"
+},
+{
+"name": "Шар AISI201d150*0.5mm",
+"price_pc": 1040.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 1040.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-a2a3b5da"
+},
+{
+"name": "Шар AISI201d180*0.5mm",
+"price_pc": 1444.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 1444.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-33ccc5b8"
+},
+{
+"name": "Шар AISI201d250*0.5mm",
+"price_pc": 3040.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 3040.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-5a52f48a"
+},
+{
+"name": "Шар AISI201d50*0.5mm",
+"price_pc": 139.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 139.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-e8dc1694"
+},
+{
+"name": "Шар AISI201d58*0.5mm",
+"price_pc": 200.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 200.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-cb92579e"
+},
+{
+"name": "Шар AISI201d76*0.5mm",
+"price_pc": 231.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 231.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-21b5ddaf"
+},
+{
+"name": "Шар Золотой AISI201d100*0.5mm",
+"price_pc": 490.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 490.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-d335fe7a"
+},
+{
+"name": "Шар Золотой AISI201d120*0.5mm",
+"price_pc": 690.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 690.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-8fb1e847"
+},
+{
+"name": "Шар Золотой AISI201d150*0.5mm",
+"price_pc": 1070.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 1070.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-a19d9d44"
+},
+{
+"name": "Шар Золотой AISI201d180*0.5mm",
+"price_pc": 2055.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 2055.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-b364b7fa"
+},
+{
+"name": "Шар Золотой AISI201d76*0.5mm",
+"price_pc": 283.0,
+"unit_src": "шт",
+"kind": "custom",
+"dims": {},
+"price": 283.0,
+"unit": "шт",
+"kgPerUnit": 0,
+"id": "imx-1c154581"
+}
+]
+}

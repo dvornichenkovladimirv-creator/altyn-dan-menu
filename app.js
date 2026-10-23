@@ -35,6 +35,10 @@
       saveLocal();
     },
     remove: function (coll, id) {
+      // Позицию из прайса поставщика не удаляем, а скрываем отметкой
+      if (storeMode === 'db' && coll === 'materials' && fromPricelist(id)) {
+        return caps.db.collection(coll).doc(id).set({ id: id, deleted: true }).catch(dbError);
+      }
       if (storeMode === 'db') return caps.db.collection(coll).doc(id).delete().catch(dbError);
       S[coll] = S[coll].filter(function (x) { return x.id !== id; });
       saveLocal();
@@ -48,7 +52,7 @@
   function dbError(e) { toast('Не сохранилось: ' + (e && e.message || 'ошибка базы'), true); }
 
   var timers = {};
-  function later(key, fn, ms) { clearTimeout(timers[key]); timers[key] = setTimeout(fn, ms || 500); }
+  function later(key, fn, ms) { clearTimeout(timers[key]); timers[key] = setTimeout(fn, ms == null ? 500 : ms); }
 
   function loadLocal() {
     var saved = lsGet(LS_KEY);
@@ -63,11 +67,38 @@
     }
   }
 
+  /* Каталог = позиции из прайсов поставщиков + свои материалы и правки поверх них.
+     Своя правка позиции из прайса действует, пока не придёт более свежий прайс этого поставщика. */
+  var own = [], pricelists = [];
+  function fromPricelist(id) { return pricelists.some(function (pl) { return (pl.items || []).some(function (it) { return it.id === id; }); }); }
+  function mergeMaterials() {
+    var map = {}, order = [];
+    pricelists.forEach(function (pl) {
+      (pl.items || []).forEach(function (it) {
+        if (!map[it.id]) order.push(it.id);
+        map[it.id] = Object.assign({ supplier: pl.supplier, priceDate: pl.priceDate }, it);
+      });
+    });
+    own.forEach(function (m) {
+      var base = map[m.id];
+      if (m.deleted) { map[m.id] = null; return; }
+      if (base && m.supplier === base.supplier && (m.priceDate || '') < (base.priceDate || '')) return;
+      if (!base) order.push(m.id);
+      map[m.id] = Object.assign({}, base || {}, m);
+    });
+    S.materials = order.map(function (id) { return map[id]; }).filter(Boolean);
+  }
+
   function connectDb() {
     storeMode = 'db';
+    caps.db.collection('pricelists').onSnapshot(function (snap) {
+      pricelists = snap.docs.map(function (d) { return d.data(); });
+      mergeMaterials(); onRemoteChange();
+    });
     ['materials', 'templates', 'orders', 'transactions'].forEach(function (coll) {
       caps.db.collection(coll).onSnapshot(function (snap) {
-        S[coll] = snap.docs.map(function (d) { return d.data(); });
+        if (coll === 'materials') { own = snap.docs.map(function (d) { return d.data(); }); mergeMaterials(); }
+        else S[coll] = snap.docs.map(function (d) { return d.data(); });
         if (coll === 'orders') S.orders.sort(function (a, b) { return (b.createdAt || '').localeCompare(a.createdAt || ''); });
         if (coll === 'transactions') sortTx();
         ready[coll] = true;
@@ -154,7 +185,7 @@
 
   function materialOptions(sel) {
     var groups = {};
-    S.materials.forEach(function (m) { (groups[kindLabel(m.kind)] = groups[kindLabel(m.kind)] || []).push(m); });
+    S.materials.forEach(function (m) { var g = kindLabel(m.kind) + (m.supplier ? ' · ' + m.supplier : ''); (groups[g] = groups[g] || []).push(m); });
     var out = '<option value="">— выберите —</option>';
     Object.keys(groups).forEach(function (g) {
       out += '<optgroup label="' + esc(g) + '">' + groups[g].sort(function (a, b) { return a.name.localeCompare(b.name, 'ru', { numeric: true }); }).map(function (m) {
@@ -164,7 +195,7 @@
     return out;
   }
 
-  var KINDS = { rect: 'Труба профильная', square: 'Труба квадратная', round: 'Труба круглая', angle: 'Уголок', strip: 'Полоса', rod: 'Круг / арматура', sheet: 'Лист', custom: 'Прочее (вес и цена вручную)' };
+  var KINDS = { rect: 'Труба профильная', square: 'Труба квадратная', round: 'Труба круглая', angle: 'Уголок', strip: 'Полоса', rod: 'Круг / арматура', profile: 'Швеллер, двутавр (вес вручную)', sheet: 'Лист', custom: 'Прочее (вес и цена вручную)' };
   function kindLabel(k) { return KINDS[k] || KINDS.custom; }
 
   /* ---------- Расчёт ---------- */
@@ -330,7 +361,7 @@
     refreshPlanFact(R);
     if (kpOpen) { var kd = $('#kp-preview'); if (kd) kd.innerHTML = kpDoc(R); }
     var buy = buyList(R, plans);
-    $('#buy').innerHTML = buy.length ? '<table class="data"><thead><tr><th>Материал</th><th class="num">Нужно</th><th class="num">С запасом ' + esc(S.settings.wastePct) + '%</th><th class="num">кг</th><th class="num">' + cur() + '</th></tr></thead><tbody>' +
+    $('#buy').innerHTML = buy.length ? '<table class="data"><thead><tr><th>Материал</th><th class="num">Нужно</th><th class="num">' + (S.settings.wholeBars ? 'Купить' : 'С запасом ' + esc(S.settings.wastePct) + '%') + '</th><th class="num">кг</th><th class="num">' + cur() + '</th></tr></thead><tbody>' +
       buy.map(function (b) {
         return '<tr><td>' + esc(b.name) + '</td><td class="num">' + C.fmtNum(b.qty, 2) + ' ' + esc(b.unit) + '</td><td class="num">' + C.fmtNum(b.qtyW, 2) + ' ' + esc(b.unit) +
           (b.bars ? '<small>' + b.bars + ' хлыст. по ' + C.fmtNum(b.stock, 2) + ' м (по карте реза)</small>' : '') + '</td><td class="num">' + C.fmtNum(b.kg, 1) + '</td><td class="num">' + n0(b.cost) + '</td></tr>';
@@ -352,7 +383,10 @@
     var w = 1 + (+S.settings.wastePct || 0) / 100;
     return Object.keys(acc).map(function (k) {
       var a = acc[k]; a.qtyW = a.kind === 'custom' ? a.qty : a.qty * w;
-      if (byMat[k]) { a.bars = byMat[k].bars.length; a.stock = byMat[k].stock; a.qtyW = Math.max(a.qty, a.bars * a.stock); }
+      if (byMat[k]) {
+        a.bars = byMat[k].bars.length; a.stock = byMat[k].stock; a.qtyW = Math.max(a.qty, a.bars * a.stock);
+        if (S.settings.wholeBars) a.cost = a.bars * a.stock * C.unitPrice(byMat[k].material);
+      }
       return a;
     }).sort(function (a, b) { return b.kg - a.kg; });
   }
@@ -558,32 +592,58 @@
 
   /* ---------- Материалы ---------- */
   function viewMaterials() {
-    var rows = S.materials.slice().sort(function (a, b) { return (a.kind || '').localeCompare(b.kind || '') || a.name.localeCompare(b.name, 'ru', { numeric: true }); }).map(function (m) {
+    var q = matQuery.toLowerCase();
+    var rows = S.materials.filter(function (m) {
+      return (!matSup || (m.supplier || 'Свои') === matSup) && (!q || m.name.toLowerCase().indexOf(q) >= 0);
+    }).sort(function (a, b) { return (a.kind || '').localeCompare(b.kind || '') || a.name.localeCompare(b.name, 'ru', { numeric: true }); }).map(function (m) {
       var id = esc(m.id), d = m.dims || {};
       var dim = function (k, ph) { return '<input id="m-' + id + '-' + k + '" class="dim" type="number" step="0.1" data-mbind="' + id + '|dims.' + k + '" data-num value="' + esc(d[k] == null ? '' : d[k]) + '" placeholder="' + ph + '" aria-label="' + ph + '">'; };
       var dims = { rect: dim('a', 'A') + dim('b', 'B') + dim('t', 't'), square: dim('a', 'A') + dim('t', 't'), round: dim('d', 'D') + dim('t', 't'),
-        angle: dim('a', 'A') + dim('b', 'B') + dim('t', 't'), strip: dim('a', 'ширина') + dim('t', 't'), rod: dim('d', 'Ø'), sheet: dim('t', 't') }[m.kind];
+        angle: dim('a', 'A') + dim('b', 'B') + dim('t', 't'), strip: dim('a', 'ширина') + dim('t', 't'), rod: dim('d', 'Ø'), sheet: dim('t', 't'), profile: '<span class="muted">по ГОСТ 8240</span>' }[m.kind];
       return '<tr>' +
         '<td><input id="m-' + id + '-name" data-mbind="' + id + '|name" value="' + esc(m.name) + '"></td>' +
         '<td><select id="m-' + id + '-kind" data-mbind="' + id + '|kind" data-struct>' + Object.keys(KINDS).map(function (k) { return '<option value="' + k + '"' + (k === m.kind ? ' selected' : '') + '>' + KINDS[k] + '</option>'; }).join('') + '</select></td>' +
         '<td class="dims">' + (dims || '<input id="m-' + id + '-unit" class="dim" data-mbind="' + id + '|unit" value="' + esc(m.unit) + '" aria-label="Единица">') + '</td>' +
-        '<td class="num">' + (m.kind === 'custom' ? '<input id="m-' + id + '-kg" class="dim" type="number" step="0.01" data-mbind="' + id + '|kgPerUnit" data-num value="' + esc(m.kgPerUnit) + '" aria-label="кг на единицу">' : '<span data-out="mkg-' + id + '">' + C.fmtNum(C.materialKg(m), 2) + '</span>') + '<small>кг/' + esc(m.unit) + '</small></td>' +
+        '<td class="num">' + (m.kind === 'custom' || m.kind === 'profile' ? '<input id="m-' + id + '-kg" class="dim" type="number" step="0.01" data-mbind="' + id + '|kgPerUnit" data-num value="' + esc(m.kgPerUnit) + '" aria-label="кг на единицу">' : '<span data-out="mkg-' + id + '">' + C.fmtNum(C.materialKg(m), 2) + '</span>') + '<small>кг/' + esc(m.unit) + '</small></td>' +
         '<td class="price-cell"><input id="m-' + id + '-price" class="num" type="number" data-mbind="' + id + '|price" data-num value="' + esc(m.price) + '" aria-label="Цена">' +
           '<select id="m-' + id + '-pm" data-mbind="' + id + '|priceMode" aria-label="За что цена"><option value="kg"' + (m.priceMode === 'kg' ? ' selected' : '') + '>за кг</option><option value="unit"' + (m.priceMode !== 'kg' ? ' selected' : '') + '>за ' + esc(m.unit) + '</option></select></td>' +
         '<td class="num" data-out="mp-' + id + '">' + money(C.unitPrice(m)) + '</td>' +
         '<td>' + (m.kind === 'sheet' || m.kind === 'custom' ? '' : '<input id="m-' + id + '-stock" class="dim" type="number" step="0.5" data-mbind="' + id + '|stockLen" data-num value="' + esc(m.stockLen || '') + '" placeholder="' + esc(S.settings.stockLen || 6) + '" aria-label="Длина хлыста, м">') + '</td>' +
+        '<td class="sup">' + esc(m.supplier || '') + (m.priceDate ? '<small>' + esc(dateRu(m.priceDate)) + '</small>' : '') + '</td>' +
         '<td>' + confirmBtn('del-mat', m.id, '×') + '</td>' +
       '</tr>';
     }).join('');
     return '<section class="panel">' +
       '<div class="panel-head"><h2>Каталог металла</h2><div class="row">' +
         '<button class="btn primary" data-action="add-mat">Добавить материал</button></div></div>' +
-      '<p class="muted">Вес трубы, уголка, листа и круга считается по размерам в миллиметрах (по ГОСТ, с учётом скруглений). Для прочего — петли, замки, профнастил — вес и цену задайте вручную.</p>' +
+      '<p class="muted">Вес трубы, уголка, листа и круга считается по размерам в миллиметрах (по ГОСТ, с учётом скруглений). Для швеллера, петель, замков и профнастила вес задаётся вручную. Цена листа — за м².</p>' +
+      priceSources() +
       '<div class="bulk row"><label class="lbl" for="bulk-pct">Цены у поставщика изменились?</label>' +
-        '<input id="bulk-pct" class="num short" type="number" step="0.5" placeholder="+5"> <span>% ко всем ценам за кг</span>' +
+        '<input id="bulk-pct" class="num short" type="number" step="0.5" placeholder="+5"> <span>% к ценам</span>' +
+        '<select id="bulk-sup" class="short-sel" aria-label="Чьим ценам">' + suppliers().map(function (x) { return '<option value="' + esc(x) + '">' + esc(x) + '</option>'; }).join('') + '<option value="">заданным за кг</option></select>' +
         '<button class="btn" data-action="bulk-price">Применить</button></div>' +
-      '<div class="scroll"><table class="data mats"><thead><tr><th>Название</th><th>Тип</th><th>Размеры, мм</th><th class="num">Вес</th><th>Цена</th><th class="num">За единицу</th><th>Хлыст, м</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+      '<div class="row mat-filter"><input id="mat-q" type="search" placeholder="Поиск: 40×40, AISI304, швеллер…" value="' + esc(matQuery) + '" aria-label="Поиск по каталогу">' +
+        '<select id="mat-sup" aria-label="Поставщик"><option value="">Все поставщики</option>' + suppliers().concat(['Свои']).map(function (x) {
+          return '<option' + (x === matSup ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join('') + '</select>' +
+        '</div>' +
+      '<div class="scroll"><table class="data mats"><thead><tr><th>Название</th><th>Тип</th><th>Размеры, мм</th><th class="num">Вес</th><th>Цена</th><th class="num">За единицу</th><th>Хлыст, м</th><th>Прайс</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
     '</section>';
+  }
+
+  var matQuery = '', matSup = '';
+  function suppliers() {
+    var x = {}; S.materials.forEach(function (m) { if (m.supplier) x[m.supplier] = 1; }); return Object.keys(x).sort();
+  }
+  function priceSources() {
+    var src = {};
+    S.materials.forEach(function (m) { if (m.supplier) { var k = m.supplier + '|' + (m.priceDate || ''); src[k] = (src[k] || 0) + 1; } });
+    var keys = Object.keys(src);
+    if (!keys.length) return '';
+    return '<div class="src">' + keys.map(function (k) {
+      var p = k.split('|'), days = p[1] ? Math.floor((Date.now() - new Date(p[1])) / 864e5) : null;
+      return '<span>Прайс <b>' + esc(p[0]) + '</b>' + (p[1] ? ' от ' + dateRu(p[1]) : '') + ': ' + src[k] + ' поз.' +
+        (days > 30 ? ' · <span class="old">цены старше месяца, обновите прайс</span>' : '') + '</span>';
+    }).join('') + '</div>';
   }
 
   /* ---------- Настройки ---------- */
@@ -611,6 +671,7 @@
           num('stockLen', 'Длина хлыста по умолчанию, м', 'можно задать свою у каждого профиля') +
           num('kerfMm', 'Ширина реза, мм', 'диск 1,6–3 мм') +
         '</div>' +
+        check('s-wholeBars', 'wholeBars', s.wholeBars, 'Металл считать по целым хлыстам (как продаёт поставщик): отход — это остаток хлыста по карте реза').replace('data-bind=', 'data-sbind=') +
         '<p class="muted">Загружайте чеки во вкладке «Деньги»: там же кнопка, которая пересчитает эти коэффициенты по фактическим расходам.</p></section>' +
       '<section class="panel"><h2>Транспорт</h2><div class="grid3">' +
           num('fuelPrice', 'Цена бензина за литр') +
@@ -1173,7 +1234,10 @@
       if (parts[1] === 'kind') { m.unit = C.unitOf(v) || m.unit || 'шт'; render(); }
       setOut('mkg-' + m.id, C.fmtNum(C.materialKg(m), 2));
       setOut('mp-' + m.id, money(C.unitPrice(m)));
-      later('mat-' + m.id, function () { Store.put('materials', clone(m)); }, 600);
+      later('mat-' + m.id, function () { if (m.supplier) m.priceDate = m.priceDate > today() ? m.priceDate : today(); Store.put('materials', clone(m)); }, 600);
+    } else if (el.id === 'mat-q' || el.id === 'mat-sup') {
+      if (el.id === 'mat-q') matQuery = el.value; else matSup = el.value;
+      later('matq', function () { render(); var f = $('#mat-q'); if (f && el.id === 'mat-q') { f.focus(); f.setSelectionRange(f.value.length, f.value.length); } }, el.id === 'mat-q' ? 250 : 0);
     } else if (el.id === 'ord-filter') {
       ordFilter = el.value; render();
     } else if (el.id === 'ai-file') {
@@ -1287,11 +1351,15 @@
     },
     'del-mat': armedAction(function (id) { Store.remove('materials', id); }),
     'bulk-price': function () {
-      var pct = parseFloat(String($('#bulk-pct').value).replace(',', '.'));
+      var pct = parseFloat(String($('#bulk-pct').value).replace(',', '.')), bulkSup = $('#bulk-sup') ? $('#bulk-sup').value : '';
       if (!pct) return toast('Введите процент, например 5 или −3', true);
       var n = 0;
       S.materials.forEach(function (m) {
-        if (m.priceMode === 'kg') { m.price = Math.round(m.price * (1 + pct / 100)); Store.put('materials', clone(m)); n++; }
+        if (m.priceMode === 'kg' || (bulkSup && m.supplier === bulkSup)) {
+          m.price = Math.round(m.price * (1 + pct / 100) * 100) / 100;
+          if (m.supplier) m.priceDate = today();
+          Store.put('materials', clone(m)); n++;
+        }
       });
       render(); toast('Цены обновлены у ' + n + ' позиций');
     },

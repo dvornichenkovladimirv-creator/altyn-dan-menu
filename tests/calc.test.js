@@ -129,3 +129,21 @@ test('налог за октябрь совпадает с расчётом из
   assert.strictEqual(oct.savingIfDocs, 5000);
   assert.strictEqual(C.yearIncome(tx, 2026), 3509730);
 });
+
+test('металл по целым хлыстам: платим за хлыст, отход не начисляем', () => {
+  const mats = [{ id: 'p', name: 'Профтруба 40×20×2', kind: 'rect', dims: { a: 40, b: 20, t: 2 }, price: 765, priceMode: 'unit', unit: 'м' }];
+  const order = { items: [{ name: 'Стойка', params: [], values: {}, count: 1, parts: [{ materialId: 'p', n: '2', len: '2' }] }], options: {} };
+  const on = C.calcOrder(order, mats, { ...C.DEFAULT_SETTINGS, wholeBars: true, wastePct: 7 });
+  assert.strictEqual(on.rows.find(r => r.key === 'metal').value, 6 * 765);
+  assert.strictEqual(on.rows.find(r => r.key === 'waste'), undefined);
+  const off = C.calcOrder(order, mats, { ...C.DEFAULT_SETTINGS, wholeBars: false, wastePct: 7 });
+  assert.strictEqual(off.rows.find(r => r.key === 'metal').value, 4 * 765);
+  assert.ok(Math.abs(off.rows.find(r => r.key === 'waste').value - 4 * 765 * 0.07) < 1e-6);
+});
+
+test('швеллер: вес вручную, режется по карте реза', () => {
+  const m = { id: 's', name: 'Швеллер 10У', kind: 'profile', kgPerUnit: 9.17, price: 3749, priceMode: 'unit', unit: 'м', stockLen: 6 };
+  assert.strictEqual(C.materialKg(m), 9.17);
+  const plans = C.orderCutPlans({ items: [{ name: 'Рама', count: 1, parts: [{ materialId: 's', n: '3', len: '2.5' }] }] }, [m], C.DEFAULT_SETTINGS);
+  assert.strictEqual(plans[0].bars.length, 2);
+});
