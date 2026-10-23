@@ -908,7 +908,8 @@
 
     var table = '<section class="panel"><div class="panel-head"><h2>Операции</h2><div class="row">' +
         '<input type="month" id="fin-month" value="' + esc(finMonth) + '" aria-label="Месяц">' +
-        '<select id="fin-cat" aria-label="Статья"><option value="">Все статьи</option>' + catOptions(finCat) + '</select></div></div>' +
+        '<select id="fin-cat" aria-label="Статья"><option value="">Все статьи</option>' + catOptions(finCat) + '</select>' +
+        '<button class="btn" data-action="acc-report">Отчёт для бухгалтера (Excel)</button></div></div>' +
       (list.length ? '<div class="scroll"><table class="data tx"><thead><tr><th>Дата</th><th>Описание</th><th>Статья</th><th>Заказ</th><th title="Есть чек, накладная или ЭСФ — расход уменьшает налог">Док.</th><th class="num">Сумма</th><th></th></tr></thead><tbody>' +
         list.map(function (t) {
           var id = esc(t.id), inc = (C.CAT[t.category] || {}).type === 'income';
@@ -979,6 +980,48 @@
     '</section>';
   }
   var taxSetOpen = false;
+
+  /* ---------- Отчёт для бухгалтера: доходы, расходы, итог налога за месяц ---------- */
+  function accReport(btn) {
+    var month = finMonth, s = S.settings;
+    var tx = S.transactions.filter(function (t) { return (t.date || '').slice(0, 7) === month && (C.CAT[t.category] || {}).type !== 'skip'; })
+      .sort(function (a, b) { return (a.date || '').localeCompare(b.date || ''); });
+    if (!tx.length) return toast('За ' + monthRu(month) + ' операций нет', true);
+    btn.disabled = true;
+    loadScript(CDN + 'xlsx/0.18.5/xlsx.full.min.js').then(function () {
+      var X = window.XLSX, d = function (iso) { return iso.split('-').reverse().join('.'); };
+      var inc = tx.filter(function (t) { return C.CAT[t.category].type === 'income'; });
+      var exp = tx.filter(function (t) { return C.CAT[t.category].type === 'expense'; });
+      var sum = function (a) { return a.reduce(function (x, t) { return x + Math.abs(+t.amount || 0); }, 0); };
+      var tax = C.taxByMonth(S.transactions, s).find(function (r) { return r.month === month; });
+      var head = [[s.company || '', ''], ['Период', monthRu(month)], []];
+      var wsInc = X.utils.aoa_to_sheet(head.concat([['Дата', 'Плательщик', 'Назначение платежа', 'Сумма, ₸']],
+        inc.map(function (t) { return [d(t.date), t.counterparty || '', t.description || '', Math.abs(+t.amount)]; }),
+        [[], ['', '', 'Итого доходов', sum(inc)]]));
+      var wsExp = X.utils.aoa_to_sheet(head.concat([['Дата', 'Поставщик', 'Что куплено', 'Статья', 'Документ (чек, накладная, ЭСФ)', 'Сумма, ₸']],
+        exp.map(function (t) { return [d(t.date), t.counterparty || '', t.description || '', C.CAT[t.category].label, t.doc ? 'есть' : 'нет', Math.abs(+t.amount)]; }),
+        [[], ['', '', '', '', 'С документами', sum(exp.filter(function (t) { return t.doc; }))],
+         ['', '', '', '', 'Без документов', sum(exp.filter(function (t) { return !t.doc; }))],
+         ['', '', '', '', 'Итого расходов', sum(exp)]]));
+      var rows = [['Показатель', 'Сумма, ₸'], ['Доходы', sum(inc)], ['Расходы с документами (вычет)', tax ? tax.deductions : 0],
+        ['Расходы без документов (не вычитаются)', tax ? tax.undocumented : sum(exp)]];
+      if (tax) rows.push(['Налоговая база', tax.base], ['ИПН ' + s.taxRate + '%', tax.tax], ['Доначисления', tax.adjust], ['Итого к уплате (ориентир)', tax.total]);
+      else rows.push(['Налог', 'месяц раньше даты начала налогового учёта (' + d(s.taxFrom) + ')']);
+      var wsSum = X.utils.aoa_to_sheet(head.concat(rows, [[], [s.taxRegime || ''], ['Личные траты и переводы себе в отчёт не включены. Расчёт ориентировочный.']]));
+      wsInc['!cols'] = [{ wch: 12 }, { wch: 34 }, { wch: 60 }, { wch: 14 }];
+      wsExp['!cols'] = [{ wch: 12 }, { wch: 30 }, { wch: 44 }, { wch: 30 }, { wch: 18 }, { wch: 14 }];
+      wsSum['!cols'] = [{ wch: 42 }, { wch: 18 }];
+      var wb = X.utils.book_new();
+      X.utils.book_append_sheet(wb, wsSum, 'Итог');
+      X.utils.book_append_sheet(wb, wsInc, 'Доходы');
+      X.utils.book_append_sheet(wb, wsExp, 'Расходы');
+      var name = 'Отчёт ' + (s.company || '').replace(/[«»"]/g, '') + ' ' + month + '.xlsx';
+      var blob = new Blob([X.write(wb, { bookType: 'xlsx', type: 'array' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      if (caps.downloads) return caps.downloads.save({ filename: name, data: blob }).then(function () { toast('Отчёт сохранён'); });
+      X.writeFile(wb, name);
+    }).catch(function (e) { toast(e && e.code ? 'Скачивание отменено' : 'Отчёт не получился: ' + (e && e.message || 'ошибка'), true); })
+      .then(function () { btn.disabled = false; });
+  }
   function monthRu(ym) {
     var d = new Date(ym + '-01T00:00:00');
     return d.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' }).replace(' г.', '');
@@ -1265,6 +1308,7 @@
     'kp-pdf': kpPdf,
     'logo-del': function () { delete S.settings.logo; Store.saveSettings(); render(); },
     'fin-run': runFinance,
+    'acc-report': accReport,
     'adj-add': function () { S.settings.taxAdjustments = S.settings.taxAdjustments || []; S.settings.taxAdjustments.push({ month: finMonth, amount: 0, note: '' }); Store.saveSettings(); render(); },
     'adj-del': function (b) { S.settings.taxAdjustments.splice(b.dataset.i, 1); Store.saveSettings(); render(); },
     'fin-filter': function (b) { finCat = finCat === b.dataset.id ? '' : b.dataset.id; render(); },
