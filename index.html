@@ -283,6 +283,17 @@ tr.dup td { background: var(--mark-soft); }
 .cb-t span { display: block; height: 100%; background: var(--steel); }
 .cat-bar b { font: 500 13px var(--font-num); }
 .fixed-sug { max-width: 480px; }
+.tax { border-color: var(--steel); }
+tr.hint-row td { font-size: 12px; color: var(--muted); background: var(--mark-soft); border-bottom: 1px solid var(--line); }
+.nds { display: flex; flex-direction: column; gap: 6px; padding: 10px 0 0; }
+.nds-l { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 14px; }
+.nds-l b { font: 500 14px var(--font-num); }
+.tax-set summary { cursor: pointer; color: var(--steel); font-weight: 500; padding: 6px 0; }
+.tax-set[open] { display: flex; flex-direction: column; gap: 10px; }
+.adjs { display: flex; flex-direction: column; gap: 6px; }
+.adj { flex-wrap: nowrap; }
+.adj input[type="month"] { width: 150px; flex: none; }
+.adj .num { width: 130px; flex: none; }
 
 .toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translate(-50%, 20px); opacity: 0; background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: var(--r); font-size: 14px; max-width: calc(100% - 32px); transition: opacity .2s, transform .2s; pointer-events: none; z-index: 20; }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }

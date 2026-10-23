@@ -109,3 +109,23 @@ test('шаблоны по умолчанию считаются без ошиб�
     assert.strictEqual(r.errors, 0, t.name);
   });
 });
+
+test('налог за октябрь совпадает с расчётом из чата (389 290)', () => {
+  const s = { ...C.DEFAULT_SETTINGS, taxFrom: '2026-10-01', taxRate: 10,
+    taxAdjustments: [{ month: '2026-10', amount: 146000, note: 'по уведомлению' }] };
+  const tx = [
+    { date: '2026-10-02', category: 'client', amount: 3003530 },
+    { date: '2026-10-05', category: 'metal', amount: 570630, doc: true },
+    { date: '2026-10-06', category: 'fuel', amount: 50000, doc: false },
+    { date: '2026-09-23', category: 'client', amount: 506200 },
+    { date: '2026-09-17', category: 'fuel', amount: 12601, doc: true },
+    { date: '2026-10-07', category: 'personal', amount: 64079 }
+  ];
+  const [oct, ...rest] = C.taxByMonth(tx, s);
+  assert.strictEqual(rest.length, 0, 'сентябрь до начала учёта не считается');
+  assert.strictEqual(oct.base, 2432900);
+  assert.strictEqual(oct.tax, 243290);
+  assert.strictEqual(oct.total, 389290);
+  assert.strictEqual(oct.savingIfDocs, 5000);
+  assert.strictEqual(C.yearIncome(tx, 2026), 3509730);
+});

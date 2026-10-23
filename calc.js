@@ -341,6 +341,40 @@
     return { from: from, months: months, kg: kg, rows: out, fixedCosts: fixed, byCat: byCat };
   }
 
+  /* ---------- Налог: ИП на ОУР, ИПН с разницы «доход − расходы с документами» ---------- */
+  // Доход — поступления по статьям «оплата от клиента» и «прочий доход».
+  // Вычет — только расходы, отмеченные как подтверждённые документом (чек, накладная, ЭСФ).
+  function taxByMonth(transactions, s) {
+    var from = s.taxFrom || '', rate = (+s.taxRate || 0) / 100, months = {};
+    function m(k) { return months[k] = months[k] || { month: k, income: 0, deductions: 0, undocumented: 0, adjust: 0, adjustNotes: [] }; }
+    (transactions || []).forEach(function (t) {
+      if (!t.date || t.date < from) return;
+      var c = CAT[t.category] || CAT.other, a = Math.abs(+t.amount || 0), row = m(t.date.slice(0, 7));
+      if (c.type === 'income') row.income += a;
+      else if (c.type === 'expense') { if (t.doc) row.deductions += a; else row.undocumented += a; }
+    });
+    (s.taxAdjustments || []).forEach(function (x) {
+      if (!x.month || +x.amount === 0) return;
+      var row = m(x.month); row.adjust += +x.amount || 0; if (x.note) row.adjustNotes.push(x.note);
+    });
+    return Object.keys(months).sort().reverse().map(function (k) {
+      var r = months[k];
+      r.base = Math.max(0, r.income - r.deductions);
+      r.tax = Math.round(r.base * rate);
+      r.total = r.tax + r.adjust;
+      r.savingIfDocs = Math.round(Math.min(r.undocumented, r.base) * rate);
+      return r;
+    });
+  }
+
+  // Оборот с начала года для контроля порога НДС
+  function yearIncome(transactions, year) {
+    return (transactions || []).reduce(function (a, t) {
+      var c = CAT[t.category];
+      return a + (c && c.type === 'income' && (t.date || '').slice(0, 4) === String(year) ? Math.abs(+t.amount || 0) : 0);
+    }, 0);
+  }
+
   /* ---------- Накладные из постоянных расходов ---------- */
   function overheadPerKg(s) {
     var monthly = sum(s.fixedCosts || [], 'amount');
@@ -466,7 +500,12 @@
     leadDays: 10,
     validDays: 7,
     payTerms: 'Предоплата 70% на металл, остаток после монтажа',
-    warranty: 'Гарантия на сварные швы 12 месяцев'
+    warranty: 'Гарантия на сварные швы 12 месяцев',
+    taxRegime: 'ИП, общеустановленный режим: ИПН с разницы доходов и подтверждённых расходов',
+    taxRate: 10,
+    taxFrom: '2026-10-01',
+    taxAdjustments: [],
+    ndsThreshold: 43000000
   };
 
   var DEFAULT_TEMPLATES = [
@@ -514,7 +553,7 @@
     evalFormula: evalFormula, tryFormula: tryFormula, paramVars: paramVars,
     calcItem: calcItem, calcOrder: calcOrder, overheadPerKg: overheadPerKg,
     hasCut: hasCut, partQty: partQty, cutPlan: cutPlan, orderCutPlans: orderCutPlans, allocatePrice: allocatePrice,
-    CATEGORIES: CATEGORIES, CAT: CAT, factByOrder: factByOrder, planVsFact: planVsFact, suggestCoefficients: suggestCoefficients,
+    CATEGORIES: CATEGORIES, CAT: CAT, taxByMonth: taxByMonth, yearIncome: yearIncome, factByOrder: factByOrder, planVsFact: planVsFact, suggestCoefficients: suggestCoefficients,
     fmtNum: fmtNum, roundTo: roundTo,
     DEFAULT_MATERIALS: DEFAULT_MATERIALS, DEFAULT_SETTINGS: DEFAULT_SETTINGS, DEFAULT_TEMPLATES: DEFAULT_TEMPLATES
   };

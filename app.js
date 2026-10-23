@@ -881,7 +881,7 @@
       '<div class="panel-head"><h2>Проверьте перед сохранением</h2><div class="row">' +
         '<button class="btn primary" data-action="stage-save">Сохранить отмеченные (<span data-out="stage-count">' + staged.filter(function (x) { return x.include; }).length + '</span>)</button>' +
         '<button class="btn ghost" data-action="stage-clear">Отменить</button></div></div>' +
-      '<div class="scroll"><table class="data tx"><thead><tr><th></th><th>Дата</th><th>Описание</th><th>Статья</th><th>Заказ</th><th class="num">Сумма</th></tr></thead><tbody>' +
+      '<div class="scroll"><table class="data tx"><thead><tr><th></th><th>Дата</th><th>Описание</th><th>Статья</th><th>Заказ</th><th title="Есть чек, накладная или ЭСФ — расход уменьшает налог">Док.</th><th class="num">Сумма</th></tr></thead><tbody>' +
       staged.map(function (x, i) {
         return '<tr class="' + (x.dup ? 'dup' : '') + '">' +
           '<td><input type="checkbox" id="st-i-' + i + '" data-xbind="' + i + '|include"' + (x.include ? ' checked' : '') + ' aria-label="Сохранить"></td>' +
@@ -890,6 +890,7 @@
             '<small>' + esc([x.counterparty, x.source].filter(Boolean).join(' · ')) + (x.dup ? ' · <b>похоже, уже есть в учёте</b>' : '') + '</small></td>' +
           '<td><select id="st-c-' + i + '" data-xbind="' + i + '|category">' + catOptions(x.category) + '</select></td>' +
           '<td><select id="st-o-' + i + '" data-xbind="' + i + '|orderId">' + orderOptions(x.orderId) + '</select></td>' +
+          '<td>' + (x.direction === 'expense' ? '<input type="checkbox" id="st-doc-' + i + '" data-xbind="' + i + '|doc"' + (x.doc ? ' checked' : '') + ' aria-label="Есть документ">' : '') + '</td>' +
           '<td><input id="st-a-' + i + '" class="num ' + (x.direction === 'income' ? 'inc' : '') + '" type="number" data-xbind="' + i + '|amount" data-num value="' + esc(x.amount) + '"></td>' +
         '</tr>';
       }).join('') + '</tbody></table></div></section>' : '';
@@ -908,13 +909,14 @@
     var table = '<section class="panel"><div class="panel-head"><h2>Операции</h2><div class="row">' +
         '<input type="month" id="fin-month" value="' + esc(finMonth) + '" aria-label="Месяц">' +
         '<select id="fin-cat" aria-label="Статья"><option value="">Все статьи</option>' + catOptions(finCat) + '</select></div></div>' +
-      (list.length ? '<div class="scroll"><table class="data tx"><thead><tr><th>Дата</th><th>Описание</th><th>Статья</th><th>Заказ</th><th class="num">Сумма</th><th></th></tr></thead><tbody>' +
+      (list.length ? '<div class="scroll"><table class="data tx"><thead><tr><th>Дата</th><th>Описание</th><th>Статья</th><th>Заказ</th><th title="Есть чек, накладная или ЭСФ — расход уменьшает налог">Док.</th><th class="num">Сумма</th><th></th></tr></thead><tbody>' +
         list.map(function (t) {
           var id = esc(t.id), inc = (C.CAT[t.category] || {}).type === 'income';
           return '<tr><td class="nowrap">' + esc((t.date || '').split('-').reverse().join('.')) + '</td>' +
             '<td><input id="tx-s-' + id + '" data-tx="' + id + '|description" value="' + esc(t.description) + '" aria-label="Описание"><small>' + esc(t.counterparty || '') + '</small></td>' +
             '<td><select id="tx-c-' + id + '" data-tx="' + id + '|category" aria-label="Статья">' + catOptions(t.category) + '</select></td>' +
             '<td><select id="tx-o-' + id + '" data-tx="' + id + '|orderId" aria-label="Заказ">' + orderOptions(t.orderId) + '</select></td>' +
+            '<td>' + (inc || t.category === 'personal' ? '' : '<input type="checkbox" id="tx-doc-' + id + '" data-tx="' + id + '|doc"' + (t.doc ? ' checked' : '') + ' aria-label="Есть документ">') + '</td>' +
             '<td class="num ' + (inc ? 'inc' : '') + '">' + (inc ? '+' : '−') + n0(t.amount) + '</td>' +
             '<td>' + confirmBtn('del-tx', t.id, '×') + '</td></tr>';
         }).join('') + '</tbody></table></div>'
@@ -937,7 +939,49 @@
         '</div><button class="btn" data-action="coef-fixed">Заменить постоянные расходы в настройках на эти</button>' : '') +
     '</section>';
 
-    return '<div class="money">' + upload + stage + summary + bars + table + coef + '</div>';
+    return '<div class="money">' + upload + stage + taxPanel() + summary + bars + table + coef + '</div>';
+  }
+
+  function taxPanel() {
+    var s = S.settings, rows = C.taxByMonth(S.transactions, s);
+    var year = new Date().getFullYear(), yi = C.yearIncome(S.transactions, year), thr = +s.ndsThreshold || 0;
+    var first = S.transactions.filter(function (t) { return (t.date || '').slice(0, 4) === String(year); }).map(function (t) { return t.date; }).sort()[0];
+    var adj = (s.taxAdjustments || []).map(function (x, i) {
+      return '<div class="row adj">' +
+        '<input type="month" id="adj-m-' + i + '" data-sbind="taxAdjustments.' + i + '.month" value="' + esc(x.month) + '" aria-label="Месяц">' +
+        '<input id="adj-a-' + i + '" class="num" type="number" data-sbind="taxAdjustments.' + i + '.amount" data-num value="' + esc(x.amount) + '" aria-label="Сумма">' +
+        '<input id="adj-n-' + i + '" data-sbind="taxAdjustments.' + i + '.note" value="' + esc(x.note) + '" placeholder="Например: начислено по уведомлению" aria-label="Пояснение">' +
+        '<button class="icon" data-action="adj-del" data-i="' + i + '" aria-label="Удалить">×</button></div>';
+    }).join('');
+    return '<section class="panel tax">' +
+      '<div class="panel-head"><h2>Налог</h2><span class="muted">' + esc(s.taxRegime) + '</span></div>' +
+      (rows.length ? '<div class="scroll"><table class="data"><thead><tr><th>Месяц</th><th class="num">Доход</th><th class="num">Вычеты по документам</th><th class="num">База</th><th class="num">ИПН ' + C.fmtNum(s.taxRate, 1) + '%</th><th class="num">Доначисления</th><th class="num">К уплате</th></tr></thead><tbody>' +
+        rows.map(function (r) {
+          return '<tr><td class="nowrap">' + monthRu(r.month) + '</td><td class="num">' + n0(r.income) + '</td><td class="num">' + n0(r.deductions) + '</td><td class="num">' + n0(r.base) + '</td>' +
+            '<td class="num">' + n0(r.tax) + '</td><td class="num">' + (r.adjust ? n0(r.adjust) + '<small>' + esc(r.adjustNotes.join('; ')) + '</small>' : '—') + '</td><td class="num"><b>' + n0(r.total) + '</b></td></tr>' +
+            (r.undocumented ? '<tr class="hint-row"><td colspan="7">Расходы без документов: ' + money(r.undocumented) + '. Если найти на них чеки, накладные или ЭСФ, налог станет меньше на ' + money(r.savingIfDocs) + '.</td></tr>' : '');
+        }).join('') + '</tbody></table></div>'
+      : '<div class="muted">С ' + dateRu(s.taxFrom) + ' операций пока нет.</div>') +
+      (thr ? '<div class="nds"><div class="nds-l"><span>Оборот ' + year + ' по учёту' + (first ? ' (данные с ' + dateRu(first) + ')' : '') + '</span><b>' + money(yi) + ' из ' + money(thr) + '</b></div>' +
+        '<div class="cb-t"><span style="width:' + Math.min(100, yi / thr * 100).toFixed(1) + '%"></span></div>' +
+        '<small>Порог постановки на учёт по НДС. При превышении нужно встать на учёт в течение 10 рабочих дней.</small></div>' : '') +
+      '<details class="tax-set"' + (taxSetOpen ? ' open' : '') + '><summary>Параметры расчёта и доначисления</summary>' +
+        '<div class="grid3">' +
+          field('Ставка ИПН, %', '<input id="s-taxRate" type="number" step="any" data-sbind="taxRate" data-num value="' + esc(s.taxRate) + '">') +
+          field('Считать с даты', '<input id="s-taxFrom" type="date" data-sbind="taxFrom" value="' + esc(s.taxFrom) + '">') +
+          field('Порог НДС за год', '<input id="s-nds" type="number" data-sbind="ndsThreshold" data-num value="' + esc(s.ndsThreshold) + '">') +
+        '</div>' +
+        field('Режим (для себя)', '<input id="s-regime" data-sbind="taxRegime" value="' + esc(s.taxRegime) + '">') +
+        '<h3>Доначисления и уже начисленные суммы</h3><div class="adjs">' + adj + '</div>' +
+        '<button class="btn ghost" data-action="adj-add">+ сумма к месяцу</button>' +
+        '<p class="muted small">Взносы за себя (ОПВ, СО, ВОСМС) сюда не входят. Расчёт ориентировочный, перед подачей декларации сверьте с бухгалтером.</p>' +
+      '</details>' +
+    '</section>';
+  }
+  var taxSetOpen = false;
+  function monthRu(ym) {
+    var d = new Date(ym + '-01T00:00:00');
+    return d.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' }).replace(' г.', '');
   }
 
   // Текст PDF-выписки: собираем строки по координате Y
@@ -993,8 +1037,9 @@
       '- Выписка Kaspi: каждая строка с суммой — отдельная операция. «Покупка», «Платёж», исходящий «Перевод» — расход; «Пополнение», входящий перевод — доход. Переводы между своими счетами, снятие наличных, продукты, кафе, одежда → personal.\n' +
       '- Входящий перевод от человека, чьё имя или телефон совпадает с клиентом заказа → category "client" и orderNumber этого заказа.\n' +
       '- Оплату работнику (сварщик, бригада) → labor или install. Если не уверен в статье — other, но не выдумывай.\n' +
-      '- amount — положительное число; direction — "income" или "expense"; date — YYYY-MM-DD (год по контексту документа).\n\n' +
-      'Ответь только JSON: {"operations":[{"date":"2026-10-21","amount":18500,"direction":"expense","category":"fuel","description":"АЗС Helios, АИ-92","counterparty":"Helios","orderNumber":null}]}';
+      '- amount — положительное число; direction — "income" или "expense"; date — YYYY-MM-DD (год по контексту документа).\n' +
+      '- hasDocument: true, если это фискальный чек, накладная или ЭСФ (подтверждает расход для налога); false для строки выписки и оплаты по Kaspi QR без чека.\n\n' +
+      'Ответь только JSON: {"operations":[{"date":"2026-10-21","amount":18500,"direction":"expense","category":"fuel","description":"АЗС Helios, АИ-92","counterparty":"Helios","orderNumber":null,"hasDocument":true}]}';
   }
 
   async function runFinance() {
@@ -1017,7 +1062,7 @@
           else if (maxImg) jobs.push({ kind: 'скана выписки', images: r.images, source: f.name });
         } else if (maxImg) {
           var img = await shrinkImage(f, 1800).catch(function () { return f; });
-          jobs.push({ kind: 'фото чека или скриншота', images: [img], source: f.name });
+          jobs.push({ kind: 'фото чека или скриншота', images: [img], source: f.name, doc: true });
         }
       } catch (e) { toast('Не прочитался файл ' + f.name + ': ' + e.message, true); }
     }
@@ -1028,7 +1073,7 @@
       try {
         var prompt = financePrompt(job.kind) + (job.text ? '\n\nДАННЫЕ:\n' + job.text : '');
         var res = await caps.sample.json(prompt, job.images ? { images: job.images } : {});
-        (res && res.operations || []).forEach(function (op) { if (addStaged(op, job.source)) found++; });
+        (res && res.operations || []).forEach(function (op) { if (addStaged(op, job.source, !!job.doc)) found++; });
       } catch (e) {
         failed++;
         if (e && e.code === 'not_granted') { status('Нет разрешения на запрос к Claude.'); break; }
@@ -1039,7 +1084,7 @@
     toast(found ? 'Найдено операций: ' + found + (failed ? ', не распознано частей: ' + failed : '') + '. Проверьте и сохраните.' : 'Операций не найдено' + (failed ? ' (ошибок: ' + failed + ')' : ''), !found);
   }
 
-  function addStaged(op, source) {
+  function addStaged(op, source, docDefault) {
     var amount = Math.abs(parseFloat(String(op.amount).replace(/\s/g, '').replace(',', '.')));
     if (!amount) return false;
     var dir = op.direction === 'income' ? 'income' : 'expense';
@@ -1050,7 +1095,8 @@
     var date = /^\d{4}-\d{2}-\d{2}$/.test(op.date || '') ? op.date : today();
     var dup = S.transactions.concat(staged).some(function (t) { return t.date === date && Math.abs(+t.amount - amount) < 0.5; });
     staged.push({ id: uid('tx'), date: date, amount: amount, direction: dir, category: cat, description: op.description || '', counterparty: op.counterparty || '',
-      orderId: ord ? ord.id : '', source: source, include: !dup && cat !== 'personal', dup: dup });
+      orderId: ord ? ord.id : '', source: source, include: !dup && cat !== 'personal', dup: dup,
+      doc: dir === 'expense' && (typeof op.hasDocument === 'boolean' ? op.hasDocument : docDefault) });
     return true;
   }
 
@@ -1219,6 +1265,8 @@
     'kp-pdf': kpPdf,
     'logo-del': function () { delete S.settings.logo; Store.saveSettings(); render(); },
     'fin-run': runFinance,
+    'adj-add': function () { S.settings.taxAdjustments = S.settings.taxAdjustments || []; S.settings.taxAdjustments.push({ month: finMonth, amount: 0, note: '' }); Store.saveSettings(); render(); },
+    'adj-del': function (b) { S.settings.taxAdjustments.splice(b.dataset.i, 1); Store.saveSettings(); render(); },
     'fin-filter': function (b) { finCat = finCat === b.dataset.id ? '' : b.dataset.id; render(); },
     'stage-add': function () {
       staged.push({ id: uid('tx'), date: today(), amount: '', direction: 'expense', category: 'metal', description: '', counterparty: '', orderId: '', source: 'вручную', include: true });
@@ -1356,6 +1404,9 @@
     draft = lsGet(LS_DRAFT) || newDraft();
     if (!draft.items.length && S.templates[0]) draft.items.push(itemFromTemplate(S.templates[0]));
     document.addEventListener('input', onInput);
+    document.addEventListener('toggle', function (e) { if (e.target.classList && e.target.classList.contains('tax-set')) taxSetOpen = e.target.open; }, true);
+    // Налог пересчитываем, когда поле параметров отпустили, чтобы не сбивать ввод
+    document.addEventListener('change', function (e) { if (view === 'money' && e.target.dataset && e.target.dataset.sbind) render(); });
     document.addEventListener('click', function (e) {
       var b = e.target.closest('[data-action]');
       if (b && e.target.closest('button') && e.target.closest('button') !== b) return;
