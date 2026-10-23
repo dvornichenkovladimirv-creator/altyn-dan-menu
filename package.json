@@ -1,0 +1,10 @@
+{
+  "name": "metal-calc",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Калькулятор металлоконструкций: шаблоны изделий, заказы, себестоимость",
+  "scripts": {
+    "test": "node --test tests/calc.test.js",
+    "check": "node --check app.js && node --check calc.js"
+  }
+}

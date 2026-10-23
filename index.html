@@ -1,0 +1,240 @@
+<title>Сметчик металла</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=Unbounded:wght@500;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Макет: цеховой планшет — вкладки сверху, слева рабочий лист, справа закреплённый итог. */
+:root {
+  --bg: #E9ECEF;          /* холоднокатаная сталь */
+  --surface: #FFFFFF;
+  --surface-2: #F4F6F8;
+  --ink: #1A2027;
+  --muted: #5B6672;
+  --line: #D2D8DF;
+  --steel: #23405C;       /* основной: воронёная сталь */
+  --steel-ink: #FFFFFF;
+  --mark: #E0A800;        /* сигнальный жёлтый, как разметка мелом по металлу */
+  --mark-soft: #FFF4CC;
+  --good: #1E7A4C;
+  --bad: #B3261E;
+  --font-display: "Unbounded", "Golos Text", system-ui, sans-serif;
+  --font-body: "Golos Text", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-num: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --r: 6px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12161B; --surface: #1A2027; --surface-2: #212932; --ink: #E5E9ED; --muted: #94A0AC;
+    --line: #2F3944; --steel: #8DB4DA; --steel-ink: #0E1A26; --mark: #F2BE1A; --mark-soft: #3A3010;
+    --good: #5BC48D; --bad: #F2867E; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12161B; --surface: #1A2027; --surface-2: #212932; --ink: #E5E9ED; --muted: #94A0AC;
+  --line: #2F3944; --steel: #8DB4DA; --steel-ink: #0E1A26; --mark: #F2BE1A; --mark-soft: #3A3010;
+  --good: #5BC48D; --bad: #F2867E; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.45 var(--font-body); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface); }
+h2, h3 { margin: 0; text-wrap: balance; }
+h2 { font: 600 19px/1.25 var(--font-body); }
+h3 { font: 600 15px/1.3 var(--font-body); margin-top: 18px; }
+code { font-family: var(--font-num); font-size: 0.88em; background: var(--surface-2); padding: 1px 5px; border-radius: 3px; }
+small { display: block; color: var(--muted); font-size: 12px; font-weight: 400; }
+.muted { color: var(--muted); }
+p.muted { margin: 6px 0 12px; max-width: 72ch; }
+
+/* шапка */
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--surface); border-bottom: 1px solid var(--line); }
+.top-in { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; padding-block: 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); max-width: 1440px; margin: 0 auto; }
+.brand { display: flex; align-items: baseline; gap: 10px; }
+.brand b { font: 700 17px/1 var(--font-display); letter-spacing: 0.01em; }
+.brand b i { font-style: normal; background: var(--mark); color: #1A2027; padding: 1px 5px; margin-left: 2px; }
+.brand span { color: var(--muted); font-size: 12px; }
+nav { display: flex; gap: 2px; overflow-x: auto; flex: 1; min-width: 0; }
+.tab { border: 0; background: none; font: 500 14px var(--font-body); color: var(--muted); padding: 9px 12px; border-radius: var(--r); cursor: pointer; white-space: nowrap; }
+.tab:hover { color: var(--ink); background: var(--surface-2); }
+.tab[aria-current="page"] { color: var(--ink); box-shadow: inset 0 -3px 0 var(--mark); border-radius: 0; }
+#store-mode { font-size: 12px; color: var(--muted); }
+
+main { max-width: 1440px; margin: 0 auto; padding-block: 18px 80px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+/* общие блоки */
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.panel-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.panel > .btn { align-self: flex-start; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.grid2, .grid3, .grid4 { display: grid; gap: 12px; }
+.grid2 { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.grid3 { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.grid4 { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.lbl { font-size: 12px; font-weight: 500; color: var(--muted); letter-spacing: 0.02em; }
+.scroll { overflow-x: auto; min-width: 0; }
+.empty { padding: 28px; text-align: center; color: var(--muted); border: 1px dashed var(--line); border-radius: var(--r); background: var(--surface); }
+.notice { display: flex; gap: 16px; align-items: center; justify-content: space-between; flex-wrap: wrap; background: var(--mark-soft); border: 1px solid var(--mark); border-radius: var(--r); padding: 14px 16px; margin-bottom: 16px; }
+
+input, select, textarea { font: 14px var(--font-body); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 7px 9px; min-width: 0; width: 100%; }
+input:focus, select:focus, textarea:focus, button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--steel); outline-offset: 1px; }
+input.num, .num input { font-family: var(--font-num); text-align: right; }
+input.formula { font-family: var(--font-num); font-size: 13px; }
+input.short { width: 90px; }
+.check { display: flex; align-items: center; gap: 8px; font-size: 14px; padding-top: 18px; }
+.check input { width: 18px; height: 18px; accent-color: var(--steel); }
+
+.btn { font: 500 14px var(--font-body); border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 8px 14px; border-radius: var(--r); cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; }
+.btn:hover { border-color: var(--steel); }
+.btn.primary { background: var(--steel); color: var(--steel-ink); border-color: var(--steel); }
+.btn.ghost { border-color: transparent; background: none; color: var(--steel); padding-inline: 8px; }
+.btn.ghost:hover { background: var(--surface-2); }
+.btn.danger { color: var(--bad); }
+.btn.armed { background: var(--bad); color: #fff; }
+.btn.small { font-size: 13px; padding: 4px 8px; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.icon { border: 0; background: none; color: var(--muted); font-size: 20px; line-height: 1; width: 30px; height: 30px; border-radius: 4px; cursor: pointer; flex: none; }
+.icon:hover { color: var(--bad); background: var(--surface-2); }
+
+/* расчёт */
+.calc { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; align-items: start; }
+.calc-main { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.add-bar { display: flex; gap: 14px; align-items: end; justify-content: space-between; flex-wrap: wrap; }
+.add-tpl { display: flex; flex-direction: column; gap: 4px; flex: 1 1 320px; min-width: 0; }
+.add-tpl .row { flex-wrap: nowrap; }
+.add-alt { display: flex; gap: 8px; flex-wrap: wrap; }
+.ai { border-color: var(--mark); }
+.drop { display: flex; align-items: center; justify-content: center; border: 2px dashed var(--line); border-radius: var(--r); padding: 18px; cursor: pointer; color: var(--steel); font-weight: 500; }
+.drop:hover { border-color: var(--steel); }
+.drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+
+.items { display: flex; flex-direction: column; gap: 14px; }
+.item { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--steel); border-radius: var(--r); padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.item-head { display: flex; gap: 12px; align-items: center; }
+.item-name { font: 600 17px var(--font-body); border-color: transparent; background: none; padding-left: 0; }
+.item-name:hover { border-color: var(--line); padding-left: 9px; }
+.count { display: flex; align-items: center; gap: 6px; color: var(--muted); white-space: nowrap; }
+.count input { width: 70px; font-family: var(--font-num); text-align: right; }
+.ai-note { white-space: pre-line; font-size: 13px; background: var(--mark-soft); border-radius: 4px; padding: 8px 10px; }
+.params { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; background: var(--surface-2); padding: 10px; border-radius: 4px; }
+.params input { font-size: 16px; font-weight: 600; }
+table { border-collapse: collapse; width: 100%; }
+th { font: 500 12px var(--font-body); color: var(--muted); text-align: left; padding: 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+td { padding: 4px 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+td.num, th.num { text-align: right; font-family: var(--font-num); font-size: 13px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+td.unit { color: var(--muted); font-size: 13px; }
+table.parts { min-width: 760px; }
+table.parts td:first-child { width: 30%; }
+table.parts td:nth-child(2) { width: 20%; }
+.err { color: var(--bad); font-weight: 600; cursor: help; }
+.item-foot { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; justify-content: space-between; }
+.hint { font-size: 12px; color: var(--muted); }
+.hours { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+.hours input { width: 90px; }
+.item-total { font: 600 14px var(--font-num); }
+.item-actions { display: flex; gap: 4px; flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: 6px; }
+.extras { display: flex; flex-direction: column; gap: 6px; }
+.extras .row { flex-wrap: nowrap; }
+.extras .num { width: 140px; flex: none; }
+
+.summary { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 72px); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+.price-block { background: var(--steel); color: var(--steel-ink); padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+.price-block .lbl { color: inherit; opacity: 0.75; }
+.price { font: 700 34px/1.05 var(--font-display); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+.price span { font-size: 0.55em; margin-left: 6px; opacity: 0.8; }
+.kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.kpi { display: flex; flex-direction: column; gap: 2px; border-top: 1px solid currentColor; padding-top: 6px; }
+.kpi span { font-size: 11px; opacity: 0.75; text-transform: uppercase; letter-spacing: 0.06em; }
+.kpi b { font: 600 13px var(--font-num); }
+.kpi.bad b { background: var(--bad); color: #fff; padding: 0 4px; border-radius: 3px; justify-self: start; }
+.warn { background: var(--mark); color: #1A2027; font-size: 13px; padding: 6px 8px; border-radius: 4px; }
+.breakdown { padding: 10px 18px; }
+.srow { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px dashed var(--line); font-size: 14px; }
+.srow b { font: 500 14px var(--font-num); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.srow small { font-size: 11px; }
+.srow.total { border-bottom: 2px solid var(--ink); font-weight: 600; }
+.srow.total b { font-weight: 700; }
+.actions { display: flex; flex-direction: column; gap: 8px; padding: 0 18px 18px; }
+
+/* заказы */
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.stat { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; display: flex; flex-direction: column; gap: 4px; }
+.stat span { font-size: 12px; color: var(--muted); }
+.stat b { font: 600 20px var(--font-num); font-variant-numeric: tabular-nums; }
+table.data { min-width: 640px; }
+table.data td { padding: 8px 6px; }
+table.orders tbody tr { cursor: pointer; }
+table.orders tbody tr:hover { background: var(--surface-2); }
+td.wrap { max-width: 320px; font-size: 13px; }
+.row-actions { white-space: nowrap; text-align: right; }
+.pill { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 99px; background: var(--surface-2); white-space: nowrap; }
+.pill.s-согласован { background: var(--mark-soft); }
+.pill.s-вработе { background: var(--steel); color: var(--steel-ink); }
+.pill.s-сдан { background: var(--good); color: #fff; }
+.pill.s-отказ { text-decoration: line-through; color: var(--muted); }
+
+/* шаблоны */
+.tpl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.tpl { border: 1px solid var(--line); border-radius: var(--r); padding: 14px; display: flex; flex-direction: column; gap: 6px; cursor: pointer; background: var(--surface); }
+.tpl:hover { border-color: var(--steel); }
+.tpl h3 { margin: 0; }
+.cat { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.tpl-foot { display: flex; justify-content: space-between; margin-top: auto; padding-top: 8px; border-top: 1px dashed var(--line); font-size: 13px; }
+.tpl-foot b { font-family: var(--font-num); font-weight: 500; }
+.params-edit { display: flex; flex-direction: column; gap: 6px; }
+.prow { flex-wrap: nowrap; }
+.prow .key { width: 70px; flex: none; font-family: var(--font-num); font-weight: 600; }
+.prow .num { width: 100px; flex: none; }
+.short-field { max-width: 260px; margin-top: 10px; }
+.tpl-total { font-size: 15px; padding: 12px; background: var(--surface-2); border-radius: 4px; }
+
+/* материалы, настройки */
+table.mats { min-width: 900px; }
+td.dims { white-space: nowrap; }
+input.dim { width: 66px; font-family: var(--font-num); text-align: right; margin-right: 4px; }
+.price-cell { display: flex; gap: 4px; }
+.price-cell input { width: 90px; }
+.price-cell select { width: 96px; }
+.bulk { background: var(--surface-2); padding: 10px; border-radius: 4px; }
+.settings { display: grid; gap: 14px; max-width: 1000px; }
+.fixed { display: flex; flex-direction: column; gap: 6px; }
+.fixed .row { flex-wrap: nowrap; }
+.fixed .num { width: 160px; flex: none; }
+.big-out { font-size: 15px; padding-top: 6px; }
+
+.toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translate(-50%, 20px); opacity: 0; background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: var(--r); font-size: 14px; max-width: calc(100% - 32px); transition: opacity .2s, transform .2s; pointer-events: none; z-index: 20; }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.toast.bad { background: var(--bad); color: #fff; }
+.copy-fallback { position: fixed; left: -9999px; }
+footer { color: var(--muted); font-size: 12px; text-align: center; padding: 20px 16px 30px; }
+
+@media (max-width: 960px) {
+  .calc { grid-template-columns: minmax(0, 1fr); }
+  .summary { position: static; }
+}
+@media (max-width: 520px) {
+  .panel { padding: 14px; }
+  .price { font-size: 28px; }
+  .add-alt .btn { flex: 1; }
+  #store-mode { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+</style>
+
+<header class="top">
+  <div class="top-in">
+    <div class="brand"><b>Сметчик <i>металла</i></b><span id="store-mode"></span></div>
+    <nav aria-label="Разделы">
+      <button class="tab" data-view="calc">Расчёт</button>
+      <button class="tab" data-view="orders">Заказы</button>
+      <button class="tab" data-view="templates">Шаблоны</button>
+      <button class="tab" data-view="materials">Металл и цены</button>
+      <button class="tab" data-view="settings">Коэффициенты</button>
+    </nav>
+  </div>
+</header>
+<main id="view"></main>
+<footer>Вес проката — по ГОСТ 30245, 8732, 8509. Цены и коэффициенты в базовом каталоге примерные: замените на свои.</footer>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script src="calc.js"></script>
+<script src="app.js"></script>
