@@ -12,13 +12,13 @@
   var uid = function (p) { return (p || 'id') + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); };
   var n0 = function (v) { return C.fmtNum(v, 0); };
 
-  var S = { settings: clone(C.DEFAULT_SETTINGS), materials: [], templates: [], orders: [] };
+  var S = { settings: clone(C.DEFAULT_SETTINGS), materials: [], templates: [], orders: [], transactions: [] };
   var draft = null;
   var view = 'calc';
   var editTpl = null;
   var caps = { db: null, sample: null, downloads: null, images: false };
   var storeMode = 'local';
-  var ready = { materials: false, templates: false, orders: false, settings: false };
+  var ready = { materials: false, templates: false, orders: false, transactions: false, settings: false };
 
   /* ================= Хранилище ================= */
   var LS_KEY = 'metalcalc.v1', LS_DRAFT = 'metalcalc.draft';
@@ -54,6 +54,7 @@
     var saved = lsGet(LS_KEY);
     if (saved && saved.materials) {
       S = saved;
+      S.transactions = S.transactions || [];
       S.settings = Object.assign(clone(C.DEFAULT_SETTINGS), saved.settings || {});
     } else {
       S.materials = clone(C.DEFAULT_MATERIALS);
@@ -64,10 +65,11 @@
 
   function connectDb() {
     storeMode = 'db';
-    ['materials', 'templates', 'orders'].forEach(function (coll) {
+    ['materials', 'templates', 'orders', 'transactions'].forEach(function (coll) {
       caps.db.collection(coll).onSnapshot(function (snap) {
         S[coll] = snap.docs.map(function (d) { return d.data(); });
         if (coll === 'orders') S.orders.sort(function (a, b) { return (b.createdAt || '').localeCompare(a.createdAt || ''); });
+        if (coll === 'transactions') sortTx();
         ready[coll] = true;
         onRemoteChange();
       }, function () { toast('Нет доступа к базе — работаю локально', true); });
@@ -131,6 +133,7 @@
       : view === 'orders' ? viewOrders()
       : view === 'templates' ? (editTpl ? viewTplEdit() : viewTemplates())
       : view === 'materials' ? viewMaterials()
+      : view === 'money' ? viewMoney()
       : viewSettings();
     $('#view').innerHTML = banner() + html;
     if (view === 'calc') refreshCalc();
@@ -201,7 +204,7 @@
             '<button class="btn" data-action="add-blank">Собрать вручную</button>' +
           '</div>' +
         '</section>' +
-        aiPanel() +
+        aiPanel() + kpPanel() +
         '<div class="items">' + items + '</div>' +
 
         '<section class="panel">' +
@@ -227,6 +230,10 @@
         '</section>' +
 
         '<section class="panel"><h3>Что закупить</h3><div id="buy" class="scroll"></div></section>' +
+        '<section class="panel"><div class="panel-head"><h3>Карта реза</h3><button class="btn ghost" data-action="copy-cut">Скопировать для мастера</button></div>' +
+          '<p class="muted">Детали разложены по хлыстам так, чтобы осталось меньше обрезков. Рез ' + esc(S.settings.kerfMm) + ' мм учтён. Длина хлыста задаётся в «Металл и цены».</p>' +
+          '<div id="cutmap"></div></section>' +
+        (orderExists(draft.id) ? planFactPanel() : '') +
       '</div>' +
       '<aside class="summary" id="summary"></aside>' +
     '</div>';
@@ -239,15 +246,18 @@
     var parts = (it.parts || []).map(function (p, j) {
       return '<tr>' +
         '<td><select id="it-' + i + '-m-' + j + '" data-bind="items.' + i + '.parts.' + j + '.materialId" data-struct>' + materialOptions(p.materialId) + '</select></td>' +
-        '<td><input id="it-' + i + '-q-' + j + '" class="formula" data-bind="items.' + i + '.parts.' + j + '.qty" value="' + esc(p.qty) + '"></td>' +
+        '<td><input id="it-' + i + '-n-' + j + '" class="formula xs" data-bind="items.' + i + '.parts.' + j + '.n" value="' + esc(p.n) + '" placeholder="шт"></td>' +
+        '<td><input id="it-' + i + '-l-' + j + '" class="formula sm" data-bind="items.' + i + '.parts.' + j + '.len" value="' + esc(p.len) + '" placeholder="м"></td>' +
+        '<td><input id="it-' + i + '-q-' + j + '" class="formula" data-bind="items.' + i + '.parts.' + j + '.qty" value="' + esc(C.hasCut(p) ? '' : p.qty) + '"' + (C.hasCut(p) ? ' disabled' : '') + '></td>' +
         '<td class="unit" data-out="u-' + i + '-' + j + '"></td>' +
         '<td class="num" data-out="kg-' + i + '-' + j + '"></td>' +
         '<td class="num" data-out="c-' + i + '-' + j + '"></td>' +
-        '<td><input id="it-' + i + '-n-' + j + '" data-bind="items.' + i + '.parts.' + j + '.note" value="' + esc(p.note) + '" placeholder="примечание"></td>' +
+        '<td><input id="it-' + i + '-t-' + j + '" data-bind="items.' + i + '.parts.' + j + '.note" value="' + esc(p.note) + '" placeholder="примечание"></td>' +
         '<td><button class="icon" data-action="del-part" data-i="' + i + '" data-j="' + j + '" aria-label="Удалить деталь">×</button></td>' +
       '</tr>';
     }).join('');
-    var hint = (it.params || []).length ? 'Параметры в формулах: ' + it.params.map(function (p) { return '<code>' + esc(p.key) + '</code>'; }).join(', ') : 'Количество — число или формула';
+    var hint = 'Труба: шт × длина — для карты реза. Лист и штучное — в «всего».' +
+      ((it.params || []).length ? ' Параметры: ' + it.params.map(function (p) { return '<code>' + esc(p.key) + '</code>'; }).join(', ') : '');
 
     return '<article class="item">' +
       '<div class="item-head">' +
@@ -256,7 +266,7 @@
       '</div>' +
       (it.aiNote ? '<div class="ai-note">' + esc(it.aiNote) + '</div>' : '') +
       (params ? '<div class="params">' + params + '</div>' : '') +
-      '<div class="scroll"><table class="parts"><thead><tr><th>Материал</th><th>Кол-во / формула</th><th>ед.</th><th class="num">кг</th><th class="num">' + cur() + '</th><th>Примечание</th><th></th></tr></thead>' +
+      '<div class="scroll"><table class="parts"><thead><tr><th>Материал</th><th>Шт</th><th>Длина, м</th><th>или всего</th><th>ед.</th><th class="num">кг</th><th class="num">' + cur() + '</th><th>Примечание</th><th></th></tr></thead>' +
       '<tbody>' + parts + '</tbody></table></div>' +
       '<div class="item-foot">' +
         '<span class="hint">' + hint + '</span>' +
@@ -276,6 +286,12 @@
     var R = C.calcOrder(draft, S.materials, S.settings);
     R.items.forEach(function (ir, i) {
       ir.lines.forEach(function (l, j) {
+        var qel = document.getElementById('it-' + i + '-q-' + j);
+        if (qel) {
+          var cut = C.hasCut(l.part);
+          if (cut) { qel.disabled = true; qel.value = l.error ? '' : C.fmtNum(l.qty, 2); }
+          else if (qel.disabled) { qel.disabled = false; qel.value = l.part.qty || ''; }
+        }
         setOut('u-' + i + '-' + j, l.material ? l.material.unit : '');
         setOut('kg-' + i + '-' + j, l.error ? '<span class="err" title="' + esc(l.error) + '">ошибка</span>' : C.fmtNum(l.kg, 1));
         setOut('c-' + i + '-' + j, l.error ? '' : n0(l.cost) + '<small>' + C.fmtNum(l.qty, 2) + ' ' + esc(l.material ? l.material.unit : '') + '</small>');
@@ -304,19 +320,26 @@
       '</div>' +
       '<div class="actions">' +
         '<button class="btn primary" data-action="save-order">' + (orderExists(draft.id) ? 'Сохранить изменения' : 'Сохранить заказ') + '</button>' +
+        '<button class="btn" data-action="kp-open">Коммерческое предложение</button>' +
         '<button class="btn" data-action="copy-kp">Скопировать КП для WhatsApp</button>' +
         (caps.downloads ? '<button class="btn" data-action="csv">Скачать смету (CSV)</button>' : '') +
       '</div>';
 
-    var buy = buyList(R);
+    var plans = C.orderCutPlans(draft, S.materials, S.settings);
+    refreshCut(plans);
+    refreshPlanFact(R);
+    if (kpOpen) { var kd = $('#kp-preview'); if (kd) kd.innerHTML = kpDoc(R); }
+    var buy = buyList(R, plans);
     $('#buy').innerHTML = buy.length ? '<table class="data"><thead><tr><th>Материал</th><th class="num">Нужно</th><th class="num">С запасом ' + esc(S.settings.wastePct) + '%</th><th class="num">кг</th><th class="num">' + cur() + '</th></tr></thead><tbody>' +
       buy.map(function (b) {
         return '<tr><td>' + esc(b.name) + '</td><td class="num">' + C.fmtNum(b.qty, 2) + ' ' + esc(b.unit) + '</td><td class="num">' + C.fmtNum(b.qtyW, 2) + ' ' + esc(b.unit) +
-          (b.bars ? '<small>≈ ' + b.bars + ' хлыст. по 6 м</small>' : '') + '</td><td class="num">' + C.fmtNum(b.kg, 1) + '</td><td class="num">' + n0(b.cost) + '</td></tr>';
+          (b.bars ? '<small>' + b.bars + ' хлыст. по ' + C.fmtNum(b.stock, 2) + ' м (по карте реза)</small>' : '') + '</td><td class="num">' + C.fmtNum(b.kg, 1) + '</td><td class="num">' + n0(b.cost) + '</td></tr>';
       }).join('') + '</tbody></table>' : '<div class="muted">Здесь появится сводка металла по всем изделиям — список для закупки.</div>';
   }
 
-  function buyList(R) {
+  function buyList(R, plans) {
+    var byMat = {};
+    (plans || C.orderCutPlans(draft, S.materials, S.settings)).forEach(function (p) { byMat[p.material.id] = p; });
     var acc = {};
     R.items.forEach(function (ir, i) {
       var cnt = +draft.items[i].count || 0;
@@ -329,7 +352,7 @@
     var w = 1 + (+S.settings.wastePct || 0) / 100;
     return Object.keys(acc).map(function (k) {
       var a = acc[k]; a.qtyW = a.kind === 'custom' ? a.qty : a.qty * w;
-      if (a.unit === 'м' && a.kind !== 'custom') a.bars = Math.ceil(a.qtyW / 6);
+      if (byMat[k]) { a.bars = byMat[k].bars.length; a.stock = byMat[k].stock; a.qtyW = Math.max(a.qty, a.bars * a.stock); }
       return a;
     }).sort(function (a, b) { return b.kg - a.kg; });
   }
@@ -376,12 +399,12 @@
       'КАТАЛОГ материалов (id | название | единица | вес):\n' + catalog + '\n\n' +
       'Правила:\n' +
       '- Если изделие по смыслу совпадает с шаблоном, верни templateId и values (числа в метрах для каждого параметра), parts оставь пустым.\n' +
-      '- Иначе templateId = null и перечисли детали: materialId строго из каталога, qty — количество в единицах материала (метры, м², шт), можно числом или формулой из чисел.\n' +
+      '- Иначе templateId = null и перечисли детали: materialId строго из каталога. Для труб, уголка, арматуры укажи n (штук) и len (длина одной детали, м) — по ним строится карта реза. Для листа, профнастила и штучного — qty (м² или шт).\n' +
       '- Размеры, которых не видно, прими типовыми и запиши в assumptions. Не выдумывай материалы вне каталога: если нужного нет, возьми ближайший и укажи это в assumptions.\n' +
       '- Учитывай столбы с заглублением, перемычки, рёбра жёсткости, обшивку.\n\n' +
       'Ответь ТОЛЬКО JSON без пояснений:\n' +
       '{"name": "краткое название изделия", "count": 1, "templateId": "id или null", "values": {"W": 3.5}, ' +
-      '"parts": [{"materialId": "id", "qty": 12.5, "note": "что это"}], "assumptions": ["…"], "questions": ["что уточнить у клиента"]}';
+      '"parts": [{"materialId": "id", "n": 4, "len": 2.0, "note": "стойки"}, {"materialId": "id", "qty": 7.7, "note": "обшивка"}], "assumptions": ["…"], "questions": ["что уточнить у клиента"]}';
 
     var opts = { modelTier: 'complex' };
     if (aiFile) opts.images = [aiFile];
@@ -394,7 +417,8 @@
       } else {
         it = { id: uid('it'), name: r.name || 'Изделие', params: [], values: {}, count: 1, laborHours: '',
           parts: (r.parts || []).filter(function (p) { return p && p.materialId; }).map(function (p) {
-            return { materialId: String(p.materialId), qty: String(p.qty == null ? '' : p.qty), note: p.note || '' };
+            return p.len ? { materialId: String(p.materialId), n: String(p.n || 1), len: String(p.len), note: p.note || '' }
+              : { materialId: String(p.materialId), qty: String(p.qty == null ? '' : p.qty), note: p.note || '' };
           }) };
       }
       it.count = Math.max(1, +r.count || 1);
@@ -431,19 +455,23 @@
       stat('Металла в работе', C.fmtNum(kg / 1000, 2) + ' т') +
       stat('Выручка', money(rev) + '<small>прибыль ' + money(sumF(won, 'profit')) + '</small>') +
       stat('Средняя цена за кг', kg ? money(rev / kg) : '—') +
+      stat('Долги клиентов', money(S.orders.filter(function (o) { return ['в работе', 'сдан'].indexOf(o.status) >= 0; }).reduce(function (a, o) {
+        return a + Math.max(0, (+(o.totals || {}).price || 0) - C.factByOrder(S.transactions, o.id).income); }, 0))) +
     '</section>' +
     '<section class="panel">' +
       '<div class="panel-head"><h2>Заказы</h2><div class="row">' +
         '<select id="ord-filter" aria-label="Фильтр по статусу"><option value="">Все статусы</option>' + ['расчёт', 'согласован', 'в работе', 'сдан', 'отказ'].map(function (s) {
           return '<option' + (s === ordFilter ? ' selected' : '') + '>' + s + '</option>'; }).join('') + '</select>' +
       '</div></div>' +
-      (list.length ? '<div class="scroll"><table class="data orders"><thead><tr><th>№</th><th>Дата</th><th>Клиент</th><th>Изделия</th><th class="num">кг</th><th class="num">Цена</th><th>Статус</th><th></th></tr></thead><tbody>' +
+      (list.length ? '<div class="scroll"><table class="data orders"><thead><tr><th>№</th><th>Дата</th><th>Клиент</th><th>Изделия</th><th class="num">кг</th><th class="num">Цена</th><th class="num">Оплачено</th><th>Статус</th><th></th></tr></thead><tbody>' +
         list.map(function (o) {
+          var f = C.factByOrder(S.transactions, o.id), price = +(o.totals || {}).price || 0;
           return '<tr data-action="open-order" data-id="' + esc(o.id) + '" tabindex="0">' +
             '<td>' + esc(o.number) + '</td><td>' + esc((o.createdAt || '').slice(0, 10).split('-').reverse().join('.')) + '</td>' +
             '<td>' + esc(o.client || '—') + (o.phone ? '<small>' + esc(o.phone) + '</small>' : '') + '</td>' +
             '<td class="wrap">' + esc((o.items || []).map(function (it) { return itemTitle(it) + (it.count > 1 ? ' ×' + it.count : ''); }).join(', ')) + '</td>' +
-            '<td class="num">' + C.fmtNum((o.totals || {}).kg, 0) + '</td><td class="num">' + n0((o.totals || {}).price) + '</td>' +
+            '<td class="num">' + C.fmtNum((o.totals || {}).kg, 0) + '</td><td class="num">' + n0(price) + '</td>' +
+            '<td class="num">' + (f.income ? n0(f.income) + (price - f.income > 0 ? '<small class="debt">долг ' + n0(price - f.income) + '</small>' : '') : '—') + '</td>' +
             '<td><span class="pill s-' + esc(o.status).replace(/\s/g, '') + '">' + esc(o.status) + '</span></td>' +
             '<td class="row-actions"><button class="btn ghost small" data-action="copy-order" data-id="' + esc(o.id) + '">Как новый</button>' +
             confirmBtn('del-order', o.id, 'Удалить') + '</td></tr>';
@@ -488,7 +516,9 @@
     }).join('');
     var parts = (t.parts || []).map(function (p, j) {
       return '<tr><td><select id="tq-m-' + j + '" data-tbind="parts.' + j + '.materialId">' + materialOptions(p.materialId) + '</select></td>' +
-        '<td><input id="tq-q-' + j + '" class="formula" data-tbind="parts.' + j + '.qty" value="' + esc(p.qty) + '"></td>' +
+        '<td><input id="tq-c-' + j + '" class="formula xs" data-tbind="parts.' + j + '.n" value="' + esc(p.n) + '" placeholder="шт"></td>' +
+        '<td><input id="tq-l-' + j + '" class="formula sm" data-tbind="parts.' + j + '.len" value="' + esc(p.len) + '" placeholder="м"></td>' +
+        '<td><input id="tq-q-' + j + '" class="formula" data-tbind="parts.' + j + '.qty" value="' + esc(C.hasCut(p) ? '' : p.qty) + '"' + (C.hasCut(p) ? ' disabled' : '') + '></td>' +
         '<td class="num" data-out="tq-' + j + '"></td>' +
         '<td><input id="tq-n-' + j + '" data-tbind="parts.' + j + '.note" value="' + esc(p.note) + '"></td>' +
         '<td><button class="icon" data-action="tpl-del-part" data-i="' + j + '" aria-label="Удалить деталь">×</button></td></tr>';
@@ -504,8 +534,8 @@
       '<div class="params-edit">' + params + '</div>' +
       '<button class="btn ghost" data-action="tpl-add-param">+ параметр</button>' +
       '<h3>Детали</h3>' +
-      '<p class="muted">Количество — формула от параметров. Пример: <code>2*W+2*H</code> — периметр рамы; <code>ceil(L/0,8)+1</code> — число лаг с шагом 0,8 м; <code>max(H;2)</code>. Разделитель аргументов — точка с запятой.</p>' +
-      '<div class="scroll"><table class="parts"><thead><tr><th>Материал</th><th>Формула</th><th class="num">При значениях по умолчанию</th><th>Примечание</th><th></th></tr></thead><tbody>' + parts + '</tbody></table></div>' +
+      '<p class="muted">Для трубы и уголка задавайте штуки и длину одной детали: по ним строится карта реза. Пример: 4 шт × <code>H</code> — стойки, <code>ceil(L/0,8)+1</code> шт × <code>B</code> — обрешётка с шагом 0,8 м. Для листа, профнастила и фурнитуры — колонка «всего» (<code>W*H*1,1</code>, <code>4</code>). Функции: <code>ceil</code>, <code>round</code>, <code>max(H;2)</code>.</p>' +
+      '<div class="scroll"><table class="parts"><thead><tr><th>Материал</th><th>Шт</th><th>Длина, м</th><th>или всего</th><th class="num">При значениях по умолчанию</th><th>Примечание</th><th></th></tr></thead><tbody>' + parts + '</tbody></table></div>' +
       '<button class="btn ghost" data-action="tpl-add-part">+ деталь</button>' +
       '<div class="field short-field">' + '<label class="lbl" for="tp-h">Доп. часы работы (формула)</label><input id="tp-h" class="formula" data-tbind="laborHours" value="' + esc(t.laborHours || '') + '"></div>' +
       '<div class="tpl-total" data-out="tpl-total"></div>' +
@@ -515,6 +545,8 @@
   function refreshTpl() {
     var it = itemFromTemplate(editTpl); var r = C.calcItem(it, S.materials);
     r.lines.forEach(function (l, j) {
+      var qel = document.getElementById('tq-q-' + j);
+      if (qel && C.hasCut(l.part)) { qel.disabled = true; qel.value = ''; } else if (qel && qel.disabled) { qel.disabled = false; qel.value = l.part.qty || ''; }
       setOut('tq-' + j, l.error ? '<span class="err" title="' + esc(l.error) + '">' + esc(l.error) + '</span>' :
         C.fmtNum(l.qty, 2) + ' ' + esc(l.material ? l.material.unit : '') + ' · ' + C.fmtNum(l.kg, 1) + ' кг');
     });
@@ -539,6 +571,7 @@
         '<td class="price-cell"><input id="m-' + id + '-price" class="num" type="number" data-mbind="' + id + '|price" data-num value="' + esc(m.price) + '" aria-label="Цена">' +
           '<select id="m-' + id + '-pm" data-mbind="' + id + '|priceMode" aria-label="За что цена"><option value="kg"' + (m.priceMode === 'kg' ? ' selected' : '') + '>за кг</option><option value="unit"' + (m.priceMode !== 'kg' ? ' selected' : '') + '>за ' + esc(m.unit) + '</option></select></td>' +
         '<td class="num" data-out="mp-' + id + '">' + money(C.unitPrice(m)) + '</td>' +
+        '<td>' + (m.kind === 'sheet' || m.kind === 'custom' ? '' : '<input id="m-' + id + '-stock" class="dim" type="number" step="0.5" data-mbind="' + id + '|stockLen" data-num value="' + esc(m.stockLen || '') + '" placeholder="' + esc(S.settings.stockLen || 6) + '" aria-label="Длина хлыста, м">') + '</td>' +
         '<td>' + confirmBtn('del-mat', m.id, '×') + '</td>' +
       '</tr>';
     }).join('');
@@ -549,7 +582,7 @@
       '<div class="bulk row"><label class="lbl" for="bulk-pct">Цены у поставщика изменились?</label>' +
         '<input id="bulk-pct" class="num short" type="number" step="0.5" placeholder="+5"> <span>% ко всем ценам за кг</span>' +
         '<button class="btn" data-action="bulk-price">Применить</button></div>' +
-      '<div class="scroll"><table class="data mats"><thead><tr><th>Название</th><th>Тип</th><th>Размеры, мм</th><th class="num">Вес</th><th>Цена</th><th class="num">За единицу</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+      '<div class="scroll"><table class="data mats"><thead><tr><th>Название</th><th>Тип</th><th>Размеры, мм</th><th class="num">Вес</th><th>Цена</th><th class="num">За единицу</th><th>Хлыст, м</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
     '</section>';
   }
 
@@ -575,7 +608,10 @@
           num('laborPerKg', 'Работа сварщика на 1 кг', 'сдельная оплата за изготовление') +
           num('hourRate', 'Ставка часа', 'для доп. часов в изделии') +
           num('installPerKg', 'Монтаж на 1 кг', 'если в заказе отмечен монтаж') +
-        '</div></section>' +
+          num('stockLen', 'Длина хлыста по умолчанию, м', 'можно задать свою у каждого профиля') +
+          num('kerfMm', 'Ширина реза, мм', 'диск 1,6–3 мм') +
+        '</div>' +
+        '<p class="muted">Загружайте чеки во вкладке «Деньги»: там же кнопка, которая пересчитает эти коэффициенты по фактическим расходам.</p></section>' +
       '<section class="panel"><h2>Транспорт</h2><div class="grid3">' +
           num('fuelPrice', 'Цена бензина за литр') +
           num('fuelPer100', 'Расход, л на 100 км', 'газель с грузом ≈ 14–16') +
@@ -594,14 +630,428 @@
           field('Валюта', '<input id="s-currency" data-sbind="currency" value="' + esc(s.currency) + '">') +
           field('Название цеха для КП', '<input id="s-company" data-sbind="company" value="' + esc(s.company) + '">') +
           field('Телефон для КП', '<input id="s-phone" data-sbind="phone" value="' + esc(s.phone) + '">') +
-          num('leadDays', 'Срок изготовления, дней') +
-        '</div></section>' +
+          num('leadDays', 'Срок изготовления, рабочих дней') +
+          num('validDays', 'КП действительно, дней') +
+          field('Адрес цеха', '<input id="s-address" data-sbind="address" value="' + esc(s.address) + '">') +
+          field('БИН / ИИН', '<input id="s-bin" data-sbind="bin" value="' + esc(s.bin) + '">') +
+          field('Условия оплаты', '<input id="s-pay" data-sbind="payTerms" value="' + esc(s.payTerms) + '">') +
+          field('Гарантия', '<input id="s-warr" data-sbind="warranty" value="' + esc(s.warranty) + '">') +
+        '</div>' +
+        '<div class="row logo-row">' + (s.logo ? '<img src="' + esc(s.logo) + '" alt="Логотип" class="logo-prev">' : '') +
+          '<label class="btn" for="logo-file">' + (s.logo ? 'Заменить логотип' : 'Загрузить логотип для КП') + '<input id="logo-file" type="file" accept="image/*" hidden></label>' +
+          (s.logo ? '<button class="btn ghost danger" data-action="logo-del">Убрать</button>' : '') + '</div>' +
+      '</section>' +
       '<section class="panel"><h2>Резервная копия</h2>' +
         '<p class="muted">' + (storeMode === 'db' ? 'Данные хранятся в облаке и доступны с любого вашего устройства. Копия пригодится для переноса.' : 'Сейчас данные живут только в этом браузере. Сохраняйте копию раз в неделю.') + '</p>' +
         '<div class="row">' + (caps.downloads ? '<button class="btn" data-action="backup">Скачать копию (JSON)</button>' : '<button class="btn" data-action="backup-copy">Скопировать копию (JSON)</button>') +
         '<label class="btn" for="restore-file">Восстановить из файла<input id="restore-file" type="file" accept="application/json,.json" hidden></label></div>' +
       '</section>' +
     '</div>';
+  }
+
+  /* ================= Карта реза ================= */
+  function refreshCut(plans) {
+    var el = $('#cutmap'); if (!el) return;
+    if (!plans.length) { el.innerHTML = '<div class="muted">Задайте у труб и уголков штуки и длину детали, и здесь появится раскладка по хлыстам.</div>'; return; }
+    el.innerHTML = plans.map(function (p) {
+      var stockMm = Math.round(p.stock * 1000);
+      return '<div class="cut-mat">' +
+        '<div class="cut-head"><b>' + esc(p.material.name) + '</b><span>' + p.bars.length + ' хлыст. по ' + C.fmtNum(p.stock, 2) + ' м · отход ' + C.fmtNum(p.wastePct, 0) + '%' +
+          (p.joints ? ' · стыков: ' + p.joints : '') + '</span></div>' +
+        (p.uncut ? '<div class="cut-warn">' + C.fmtNum(p.uncut, 2) + ' м без нарезки: задайте шт × длину, чтобы раскладка была точной</div>' : '') +
+        p.bars.map(function (b, k) {
+          return '<div class="bar-row"><span class="bar-n">' + (k + 1) + '</span><div class="bar" role="img" aria-label="Хлыст ' + (k + 1) + ': ' + b.cuts.map(function (c) { return Math.round(c.len * 1000); }).join(' + ') + ' мм">' +
+            b.cuts.map(function (c) {
+              var w = c.len / p.stock * 100;
+              return '<span class="seg" style="flex-basis:' + w.toFixed(2) + '%" title="' + esc(c.label) + '">' + (w > 9 ? Math.round(c.len * 1000) : '') + '</span>';
+            }).join('') +
+            (b.rest > 0.001 ? '<span class="rest" style="flex-basis:' + (b.rest / p.stock * 100).toFixed(2) + '%" title="Остаток">' + (b.rest / p.stock > 0.09 ? Math.round(b.rest * 1000) : '') + '</span>' : '') +
+          '</div></div>';
+        }).join('') +
+        '<div class="cut-scale"><span>0</span><span>' + stockMm + ' мм</span></div>' +
+      '</div>';
+    }).join('');
+  }
+
+  function cutText() {
+    var plans = C.orderCutPlans(draft, S.materials, S.settings);
+    var out = ['КАРТА РЕЗА' + (draft.number ? ' · заказ № ' + draft.number : '') + (draft.client ? ' · ' + draft.client : ''), 'Рез ' + S.settings.kerfMm + ' мм, размеры в мм', ''];
+    plans.forEach(function (p) {
+      out.push(p.material.name + ' — ' + p.bars.length + ' хлыст. по ' + C.fmtNum(p.stock, 2) + ' м');
+      p.bars.forEach(function (b, k) {
+        out.push('  ' + (k + 1) + ') ' + b.cuts.map(function (c) { return Math.round(c.len * 1000) + ' (' + c.label + ')'; }).join(' + ') + '  | остаток ' + Math.round(b.rest * 1000));
+      });
+      out.push('');
+    });
+    return out.join('\n');
+  }
+
+  /* ================= План против факта ================= */
+  function planFactPanel() {
+    var cats = C.CATEGORIES.filter(function (c) { return c.type !== 'skip'; }).map(function (c) {
+      return '<option value="' + c.id + '">' + esc(c.label) + '</option>'; }).join('');
+    return '<section class="panel"><div class="panel-head"><h3>План против факта</h3><span class="muted">по операциям, привязанным к заказу</span></div>' +
+      '<div id="planfact"></div>' +
+      '<div class="pf-add row">' +
+        '<select id="pf-cat" aria-label="Статья">' + cats + '</select>' +
+        '<input id="pf-amount" class="num" type="number" placeholder="Сумма" aria-label="Сумма">' +
+        '<input id="pf-desc" placeholder="Что это (необязательно)" aria-label="Описание">' +
+        '<button class="btn" data-action="pf-add">Записать</button>' +
+      '</div>' +
+      '<p class="muted">Чеки и выписку удобнее загрузить во вкладке «Деньги»: там операции можно сразу привязать к заказу.</p>' +
+    '</section>';
+  }
+
+  function refreshPlanFact(R) {
+    var el = $('#planfact'); if (!el) return;
+    var pf = C.planVsFact(R, S.transactions, draft.id);
+    // Пока заказ не сдан, факт неполный: итоговую разницу и прибыль не показываем
+    var done = draft.status === 'сдан';
+    var diff = function (plan, fact) {
+      var d = fact - plan; if (!fact) return '<td class="num muted">—</td>';
+      return '<td class="num ' + (d > plan * 0.05 ? 'over' : d < 0 ? 'under' : '') + '">' + (d > 0 ? '+' : '') + n0(d) + '</td>';
+    };
+    el.innerHTML = '<div class="pf-tiles">' +
+      kpi('Оплачено клиентом', money(pf.paid)) +
+      kpi('Долг клиента', money(Math.max(0, pf.debt)), pf.debt > 0 ? 'warnk' : '') +
+      kpi('Прибыль по плану', money(pf.planProfit)) +
+      (done ? kpi('Прибыль по факту', money(pf.factProfit), pf.factProfit < pf.planProfit ? 'bad' : 'good')
+        : kpi('Внесено расходов', money(pf.factDirect) + ' из ' + n0(pf.planDirect))) +
+    '</div>' +
+    '<div class="scroll"><table class="data"><thead><tr><th>Статья</th><th class="num">План</th><th class="num">Факт</th><th class="num">Разница</th></tr></thead><tbody>' +
+      pf.rows.map(function (r) { return '<tr><td>' + esc(r.label) + '</td><td class="num">' + n0(r.plan) + '</td><td class="num">' + (r.fact ? n0(r.fact) : '—') + '</td>' + diff(r.plan, r.fact) + '</tr>'; }).join('') +
+      '<tr class="tot"><td>Прямые затраты</td><td class="num">' + n0(pf.planDirect) + '</td><td class="num">' + n0(pf.factDirect) + '</td>' + (done ? diff(pf.planDirect, pf.factDirect) : '<td class="num muted">после сдачи</td>') + '</tr>' +
+    '</tbody></table></div>' +
+    '<p class="muted small">Постоянные расходы (аренда и т.п.) в план не входят: они считаются за месяц, а не по заказу. Прибыль по факту появится, когда заказ получит статус «сдан».</p>';
+  }
+
+  /* ================= Коммерческое предложение ================= */
+  var kpOpen = false;
+  function kpPanel() {
+    if (!kpOpen) return '';
+    var k = draft.kp || {}, s = S.settings;
+    return '<section class="panel kp-panel">' +
+      '<div class="panel-head"><h3>Коммерческое предложение</h3><button class="icon" data-action="kp-close" aria-label="Закрыть">×</button></div>' +
+      '<div class="grid3">' +
+        field('Условия оплаты', '<input id="kp-pay" data-bind="kp.payTerms" value="' + esc(k.payTerms != null ? k.payTerms : s.payTerms) + '">') +
+        field('Срок изготовления, раб. дней', '<input id="kp-lead" data-bind="kp.leadDays" value="' + esc(k.leadDays != null ? k.leadDays : s.leadDays) + '">') +
+        field('Действительно, дней', '<input id="kp-valid" data-bind="kp.validDays" value="' + esc(k.validDays != null ? k.validDays : s.validDays) + '">') +
+      '</div>' +
+      field('Дополнительно для клиента', '<textarea id="kp-note" rows="2" data-bind="kp.note" placeholder="Например: цвет покраски по RAL на выбор, вывоз мусора включён">' + esc(k.note || '') + '</textarea>') +
+      check('kp-unit', 'kp.hideItemPrices', k.hideItemPrices, 'Не показывать цену по позициям, только итог') +
+      '<div class="kp-wrap"><div id="kp-preview"></div></div>' +
+      '<div class="row"><button class="btn primary" data-action="kp-pdf">Скачать PDF</button>' +
+        '<button class="btn" data-action="copy-kp">Скопировать текстом</button>' +
+        (s.company === 'Мой цех' || !s.phone ? '<span class="muted">Название цеха, телефон и логотип задаются во вкладке «Коэффициенты».</span>' : '') + '</div>' +
+    '</section>';
+  }
+
+  function kpVal(key) { var k = draft.kp || {}; return k[key] != null && k[key] !== '' ? k[key] : S.settings[key]; }
+  function addDays(d, n) { var x = new Date(d); x.setDate(x.getDate() + (+n || 0)); return x; }
+  function dateRu(d) { return new Date(d).toLocaleDateString('ru-RU'); }
+
+  function kpDoc(R) {
+    var s = S.settings, o = draft.options, prices = C.allocatePrice(R, draft, s), hide = (draft.kp || {}).hideItemPrices;
+    var date = draft.createdAt || new Date().toISOString();
+    var incl = ['металл', 'изготовление'];
+    if (o.paint) incl.push('грунт и покраска');
+    if (+o.trips) incl.push('доставка');
+    if (o.install) incl.push('монтаж на объекте');
+    var rows = draft.items.map(function (it, i) {
+      var vars = C.paramVars(it.params, it.values);
+      var dims = (it.params || []).map(function (p) { return esc((p.label || p.key).replace(/,.*$/, '')) + ' ' + C.fmtNum(vars[p.key], 2) + ' м'; }).join(', ');
+      var cnt = +it.count || 1;
+      return '<tr><td>' + (i + 1) + '</td><td><b>' + esc(it.name) + '</b>' + (dims ? '<div class="kp-dim">' + dims + '</div>' : '') + '</td><td class="r">' + cnt + ' шт</td>' +
+        (hide ? '' : '<td class="r">' + n0(prices[i] / cnt) + '</td><td class="r">' + n0(prices[i]) + '</td>') + '</tr>';
+    }).join('');
+    return '<div class="kp-doc" id="kp-doc">' +
+      '<header class="kp-head">' + (s.logo ? '<img src="' + esc(s.logo) + '" alt="">' : '') +
+        '<div><div class="kp-co">' + esc(s.company) + '</div><div class="kp-req">' + [s.address, s.phone, s.bin ? 'БИН ' + s.bin : ''].filter(Boolean).map(esc).join(' · ') + '</div></div></header>' +
+      '<h1>Коммерческое предложение</h1>' +
+      '<div class="kp-meta">' + (draft.number ? '№ ' + esc(draft.number) + ' ' : '') + 'от ' + dateRu(date) +
+        (draft.client ? '<br>Для: <b>' + esc(draft.client) + '</b>' : '') + (draft.address ? '<br>Объект: ' + esc(draft.address) : '') + '</div>' +
+      '<table class="kp-table"><thead><tr><th>№</th><th>Наименование</th><th class="r">Кол-во</th>' + (hide ? '' : '<th class="r">Цена</th><th class="r">Сумма</th>') + '</tr></thead><tbody>' + rows + '</tbody></table>' +
+      '<div class="kp-total"><span>Итого</span><b>' + money(R.price) + '</b></div>' +
+      '<div class="kp-incl">В стоимость входит: ' + incl.join(', ') + '.</div>' +
+      '<dl class="kp-terms">' +
+        (kpVal('leadDays') ? '<dt>Срок изготовления</dt><dd>' + esc(kpVal('leadDays')) + ' рабочих дней с момента предоплаты</dd>' : '') +
+        (kpVal('payTerms') ? '<dt>Оплата</dt><dd>' + esc(kpVal('payTerms')) + '</dd>' : '') +
+        (s.warranty ? '<dt>Гарантия</dt><dd>' + esc(s.warranty) + '</dd>' : '') +
+        (kpVal('validDays') ? '<dt>Предложение действительно</dt><dd>до ' + dateRu(addDays(new Date(), kpVal('validDays'))) + '</dd>' : '') +
+      '</dl>' +
+      ((draft.kp || {}).note ? '<p class="kp-note">' + esc(draft.kp.note) + '</p>' : '') +
+      '<footer class="kp-foot"><span>' + esc(s.company) + (s.phone ? ', ' + esc(s.phone) : '') + '</span><span>Подпись ____________</span></footer>' +
+    '</div>';
+  }
+
+  var CDN = 'https://cdnjs.cloudflare.com/ajax/libs/';
+  var scriptCache = {};
+  function loadScript(src) {
+    return scriptCache[src] = scriptCache[src] || new Promise(function (ok, fail) {
+      var el = document.createElement('script'); el.src = src; el.onload = ok;
+      el.onerror = function () { delete scriptCache[src]; fail(new Error('не загрузилась библиотека')); };
+      document.head.appendChild(el);
+    });
+  }
+
+  function kpPdf(btn) {
+    var doc = $('#kp-doc'); if (!doc) return;
+    btn.disabled = true; btn.textContent = 'Готовлю PDF…';
+    var done = function () { btn.disabled = false; btn.textContent = 'Скачать PDF'; };
+    Promise.all([loadScript(CDN + 'html2canvas/1.4.1/html2canvas.min.js'), loadScript(CDN + 'jspdf/2.5.1/jspdf.umd.min.js')])
+      .then(function () { return document.fonts ? document.fonts.ready : null; })
+      .then(function () {
+        doc.classList.add('kp-capture');
+        return window.html2canvas(doc, { scale: 2, backgroundColor: '#ffffff', windowWidth: 1200 });
+      }).then(function (canvas) {
+        doc.classList.remove('kp-capture');
+        var pdf = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' });
+        var pw = 210, pxPerMm = canvas.width / pw, pageH = Math.floor(297 * pxPerMm);
+        for (var y = 0, page = 0; y < canvas.height; y += pageH, page++) {
+          var h = Math.min(pageH, canvas.height - y), slice = document.createElement('canvas');
+          slice.width = canvas.width; slice.height = h;
+          slice.getContext('2d').drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
+          if (page) pdf.addPage();
+          pdf.addImage(slice.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, pw, h / pxPerMm);
+        }
+        var name = 'KP-' + (draft.number || 'raschet') + (draft.client ? '-' + draft.client.replace(/[^\wА-Яа-яЁё]+/g, '_') : '') + '.pdf';
+        if (caps.downloads) return caps.downloads.save({ filename: name, data: pdf.output('blob') }).then(function () { toast('PDF сохранён'); });
+        pdf.save(name);
+      }).catch(function (e) {
+        doc.classList.remove('kp-capture');
+        if (e && e.code) toast('Скачивание отменено', true); else toast('PDF не получился: ' + (e && e.message || 'ошибка'), true);
+      }).then(done);
+  }
+
+  function setLogo(file) {
+    if (!file) return;
+    shrinkImage(file, 360, 'image/png').then(function (blob) {
+      var r = new FileReader();
+      r.onload = function () { S.settings.logo = r.result; Store.saveSettings(); render(); };
+      r.readAsDataURL(blob);
+    }).catch(function () { toast('Не удалось прочитать картинку', true); });
+  }
+
+  function shrinkImage(file, max, type) {
+    return createImageBitmap(file).then(function (bmp) {
+      var k = Math.min(1, max / Math.max(bmp.width, bmp.height));
+      var c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+      c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+      return new Promise(function (ok, fail) { c.toBlob(function (b) { b ? ok(b) : fail(new Error('canvas')); }, type || 'image/jpeg', 0.85); });
+    });
+  }
+
+  /* ================= Деньги: чеки, выписки Kaspi, учёт ================= */
+  var staged = [], finMonth = new Date().toISOString().slice(0, 7), finCat = '', coefMonths = 3, finFiles = [], finBusy = false;
+  function today() { return new Date().toISOString().slice(0, 10); }
+  function sortTx() { S.transactions.sort(function (a, b) { return (b.date || '').localeCompare(a.date || '') || (b.createdAt || '').localeCompare(a.createdAt || ''); }); }
+  function catOptions(sel) {
+    return C.CATEGORIES.map(function (c) { return '<option value="' + c.id + '"' + (c.id === sel ? ' selected' : '') + '>' + esc(c.label) + '</option>'; }).join('');
+  }
+  function orderOptions(sel) {
+    return '<option value="">— без заказа —</option>' + S.orders.filter(function (o) { return o.status !== 'отказ' || o.id === sel; }).map(function (o) {
+      return '<option value="' + esc(o.id) + '"' + (o.id === sel ? ' selected' : '') + '>№' + esc(o.number) + ' · ' + esc(o.client || 'без имени') + '</option>';
+    }).join('');
+  }
+
+  function viewMoney() {
+    var month = S.transactions.filter(function (t) { return (t.date || '').slice(0, 7) === finMonth; });
+    var inc = 0, exp = 0, byCat = {};
+    month.forEach(function (t) {
+      var c = C.CAT[t.category] || C.CAT.other, a = Math.abs(+t.amount || 0);
+      if (c.type === 'income') inc += a;
+      else if (c.type === 'expense') { exp += a; byCat[c.id] = (byCat[c.id] || 0) + a; }
+    });
+    var cats = Object.keys(byCat).sort(function (a, b) { return byCat[b] - byCat[a]; });
+    var maxC = cats.length ? byCat[cats[0]] : 1;
+    var list = month.filter(function (t) { return !finCat || t.category === finCat; });
+
+    var upload = '<section class="panel">' +
+      '<h2>Загрузить чеки и выписку</h2>' +
+      '<p class="muted">Фото чеков, скриншоты или PDF-выписка Kaspi за месяц. Claude разнесёт операции по статьям и привяжет оплаты к заказам по имени клиента. Перед сохранением всё можно поправить.</p>' +
+      (caps.sample ? '<label class="drop" for="fin-files"><input type="file" id="fin-files" multiple accept="image/*,application/pdf,.pdf"><span data-out="fin-files-name">' +
+          (finFiles.length ? finFiles.map(function (f) { return esc(f.name); }).join(', ') : 'Выбрать фото чеков или выписку (PDF)') + '</span></label>' +
+        field('Или вставьте текст: SMS, выгрузку, список трат', '<textarea id="fin-text" rows="2" placeholder="21.10 АЗС Helios 18 500; 22.10 электроды МР-3 4 пачки 24 000"></textarea>') +
+        '<div class="row"><button class="btn primary" data-action="fin-run"' + (finBusy ? ' disabled' : '') + '>' + (finBusy ? 'Распознаю…' : 'Распознать') + '</button>' +
+        '<button class="btn ghost" data-action="stage-add">+ операция вручную</button><span id="fin-status" class="muted"></span></div>'
+      : '<p class="muted">Распознавание работает в облачной версии на claude.ai. Здесь можно добавить операции вручную.</p><button class="btn" data-action="stage-add">+ операция вручную</button>') +
+    '</section>';
+
+    var stage = staged.length ? '<section class="panel stage">' +
+      '<div class="panel-head"><h2>Проверьте перед сохранением</h2><div class="row">' +
+        '<button class="btn primary" data-action="stage-save">Сохранить отмеченные (<span data-out="stage-count">' + staged.filter(function (x) { return x.include; }).length + '</span>)</button>' +
+        '<button class="btn ghost" data-action="stage-clear">Отменить</button></div></div>' +
+      '<div class="scroll"><table class="data tx"><thead><tr><th></th><th>Дата</th><th>Описание</th><th>Статья</th><th>Заказ</th><th class="num">Сумма</th></tr></thead><tbody>' +
+      staged.map(function (x, i) {
+        return '<tr class="' + (x.dup ? 'dup' : '') + '">' +
+          '<td><input type="checkbox" id="st-i-' + i + '" data-xbind="' + i + '|include"' + (x.include ? ' checked' : '') + ' aria-label="Сохранить"></td>' +
+          '<td><input type="date" id="st-d-' + i + '" data-xbind="' + i + '|date" value="' + esc(x.date) + '"></td>' +
+          '<td><input id="st-s-' + i + '" data-xbind="' + i + '|description" value="' + esc(x.description) + '">' +
+            '<small>' + esc([x.counterparty, x.source].filter(Boolean).join(' · ')) + (x.dup ? ' · <b>похоже, уже есть в учёте</b>' : '') + '</small></td>' +
+          '<td><select id="st-c-' + i + '" data-xbind="' + i + '|category">' + catOptions(x.category) + '</select></td>' +
+          '<td><select id="st-o-' + i + '" data-xbind="' + i + '|orderId">' + orderOptions(x.orderId) + '</select></td>' +
+          '<td><input id="st-a-' + i + '" class="num ' + (x.direction === 'income' ? 'inc' : '') + '" type="number" data-xbind="' + i + '|amount" data-num value="' + esc(x.amount) + '"></td>' +
+        '</tr>';
+      }).join('') + '</tbody></table></div></section>' : '';
+
+    var summary = '<section class="stats">' +
+      stat('Поступления', money(inc)) + stat('Расходы', money(exp)) +
+      stat('Разница', '<span class="' + (inc - exp < 0 ? 'neg' : '') + '">' + money(inc - exp) + '</span>') +
+      stat('Операций', month.length) +
+    '</section>';
+
+    var bars = cats.length ? '<section class="panel"><h3>Куда ушли деньги</h3><div class="cat-bars">' + cats.map(function (id) {
+      return '<button class="cat-bar' + (finCat === id ? ' on' : '') + '" data-action="fin-filter" data-id="' + id + '"><span class="cb-l">' + esc(C.CAT[id].label) + '</span>' +
+        '<span class="cb-t"><span style="width:' + (byCat[id] / maxC * 100).toFixed(1) + '%"></span></span><b>' + n0(byCat[id]) + '</b></button>';
+    }).join('') + '</div></section>' : '';
+
+    var table = '<section class="panel"><div class="panel-head"><h2>Операции</h2><div class="row">' +
+        '<input type="month" id="fin-month" value="' + esc(finMonth) + '" aria-label="Месяц">' +
+        '<select id="fin-cat" aria-label="Статья"><option value="">Все статьи</option>' + catOptions(finCat) + '</select></div></div>' +
+      (list.length ? '<div class="scroll"><table class="data tx"><thead><tr><th>Дата</th><th>Описание</th><th>Статья</th><th>Заказ</th><th class="num">Сумма</th><th></th></tr></thead><tbody>' +
+        list.map(function (t) {
+          var id = esc(t.id), inc = (C.CAT[t.category] || {}).type === 'income';
+          return '<tr><td class="nowrap">' + esc((t.date || '').split('-').reverse().join('.')) + '</td>' +
+            '<td><input id="tx-s-' + id + '" data-tx="' + id + '|description" value="' + esc(t.description) + '" aria-label="Описание"><small>' + esc(t.counterparty || '') + '</small></td>' +
+            '<td><select id="tx-c-' + id + '" data-tx="' + id + '|category" aria-label="Статья">' + catOptions(t.category) + '</select></td>' +
+            '<td><select id="tx-o-' + id + '" data-tx="' + id + '|orderId" aria-label="Заказ">' + orderOptions(t.orderId) + '</select></td>' +
+            '<td class="num ' + (inc ? 'inc' : '') + '">' + (inc ? '+' : '−') + n0(t.amount) + '</td>' +
+            '<td>' + confirmBtn('del-tx', t.id, '×') + '</td></tr>';
+        }).join('') + '</tbody></table></div>'
+      : '<div class="empty">За этот месяц операций нет. Загрузите чеки или выписку выше.</div>') +
+    '</section>';
+
+    var sug = C.suggestCoefficients(S.transactions, S.orders, S.settings, coefMonths);
+    var coef = '<section class="panel"><div class="panel-head"><h2>Коэффициенты по факту</h2>' +
+        '<select id="coef-months" aria-label="Период">' + [1, 3, 6, 12].map(function (m) { return '<option value="' + m + '"' + (m === coefMonths ? ' selected' : '') + '>за ' + m + ' мес.</option>'; }).join('') + '</select></div>' +
+      '<p class="muted">Сравнение ваших настроек с реальными расходами с ' + dateRu(sug.from) + '. Объём металла берётся из заказов в работе и сданных: ' + C.fmtNum(sug.kg, 0) + ' кг.</p>' +
+      (sug.rows.length ? '<div class="scroll"><table class="data"><thead><tr><th>Коэффициент</th><th class="num">Сейчас</th><th class="num">По факту</th><th></th></tr></thead><tbody>' +
+        sug.rows.map(function (r) {
+          var big = r.current && Math.abs(r.fact - r.current) / r.current > 0.15;
+          return '<tr><td>' + esc(r.label) + '</td><td class="num">' + n0(r.current) + '</td><td class="num' + (big ? ' over' : '') + '">' + n0(r.fact) + '</td>' +
+            '<td><button class="btn small" data-action="coef-apply" data-key="' + r.key + '" data-val="' + r.fact + '">Применить</button></td></tr>';
+        }).join('') + '</tbody></table></div>'
+      : '<div class="muted">' + (sug.kg ? 'Пока нет расходов по статьям, которые считаются на кг.' : 'Нужны заказы со статусом «в работе» или «сдан» за этот период, чтобы посчитать расход на 1 кг.') + '</div>') +
+      (sug.fixedCosts.length ? '<h3>Постоянные расходы, в среднем за месяц</h3><div class="fixed-sug">' +
+        sug.fixedCosts.map(function (f) { return '<div class="srow"><span>' + esc(f.name) + '</span><b>' + n0(f.amount) + '</b></div>'; }).join('') +
+        '</div><button class="btn" data-action="coef-fixed">Заменить постоянные расходы в настройках на эти</button>' : '') +
+    '</section>';
+
+    return '<div class="money">' + upload + stage + summary + bars + table + coef + '</div>';
+  }
+
+  // Текст PDF-выписки: собираем строки по координате Y
+  async function pdfToText(file, maxPages) {
+    await loadScript(CDN + 'pdf.js/3.11.174/pdf.worker.min.js');
+    await loadScript(CDN + 'pdf.js/3.11.174/pdf.min.js');
+    var pdf = await window.pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+    var pages = [], images = [];
+    for (var n = 1; n <= pdf.numPages; n++) {
+      var page = await pdf.getPage(n), content = await page.getTextContent(), rows = {};
+      content.items.forEach(function (it) {
+        var y = Math.round(it.transform[5]);
+        (rows[y] = rows[y] || []).push({ x: it.transform[4], s: it.str });
+      });
+      pages.push(Object.keys(rows).sort(function (a, b) { return b - a; }).map(function (y) {
+        return rows[y].sort(function (a, b) { return a.x - b.x; }).map(function (r) { return r.s; }).join(' ').replace(/\s+/g, ' ').trim();
+      }).filter(Boolean).join('\n'));
+    }
+    var text = pages.join('\n');
+    if (text.replace(/\s/g, '').length < 80) {
+      // Скан без текстового слоя — отправим страницы картинками
+      for (var k = 1; k <= Math.min(pdf.numPages, maxPages); k++) {
+        var pg = await pdf.getPage(k), vp = pg.getViewport({ scale: 1.6 }), c = document.createElement('canvas');
+        c.width = vp.width; c.height = vp.height;
+        await pg.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+        images.push(await new Promise(function (ok) { c.toBlob(ok, 'image/jpeg', 0.85); }));
+      }
+      text = '';
+    }
+    return { text: text, images: images };
+  }
+
+  function chunkText(text, maxBytes) {
+    var out = [], cur = '', enc = new TextEncoder();
+    text.split('\n').forEach(function (line) {
+      if (enc.encode(cur + line).length > maxBytes && cur) { out.push(cur); cur = ''; }
+      cur += line + '\n';
+    });
+    if (cur.trim()) out.push(cur);
+    return out;
+  }
+
+  function financePrompt(kind) {
+    var orders = S.orders.filter(function (o) { return o.status !== 'отказ'; }).slice(0, 60).map(function (o) {
+      return '№' + o.number + ' | ' + (o.client || '—') + ' | ' + (o.phone || '—') + ' | ' + n0((o.totals || {}).price);
+    }).join('\n');
+    return 'Ты бухгалтер небольшого цеха металлоконструкций в Казахстане. Извлеки денежные операции из ' + kind + '.\n' +
+      'Сегодня ' + today() + '. Валюта — тенге.\n\n' +
+      'Статьи (id — описание):\n' + C.CATEGORIES.map(function (c) { return c.id + ' — ' + c.label; }).join('\n') + '\n\n' +
+      'Заказы (номер | клиент | телефон | сумма):\n' + (orders || '(нет)') + '\n\n' +
+      'Правила:\n' +
+      '- Чек магазина — одна операция-расход на итоговую сумму. Статья по товарам: электроды, диски, газ, проволока → consumables; труба, лист, уголок, петли, замки, профнастил → metal; краска, грунт, растворитель → paint; АЗС, бензин → fuel.\n' +
+      '- Выписка Kaspi: каждая строка с суммой — отдельная операция. «Покупка», «Платёж», исходящий «Перевод» — расход; «Пополнение», входящий перевод — доход. Переводы между своими счетами, снятие наличных, продукты, кафе, одежда → personal.\n' +
+      '- Входящий перевод от человека, чьё имя или телефон совпадает с клиентом заказа → category "client" и orderNumber этого заказа.\n' +
+      '- Оплату работнику (сварщик, бригада) → labor или install. Если не уверен в статье — other, но не выдумывай.\n' +
+      '- amount — положительное число; direction — "income" или "expense"; date — YYYY-MM-DD (год по контексту документа).\n\n' +
+      'Ответь только JSON: {"operations":[{"date":"2026-10-21","amount":18500,"direction":"expense","category":"fuel","description":"АЗС Helios, АИ-92","counterparty":"Helios","orderNumber":null}]}';
+  }
+
+  async function runFinance() {
+    var text = (($('#fin-text') || {}).value || '').trim();
+    if (!finFiles.length && !text) { $('#fin-status').textContent = 'Выберите файлы или вставьте текст.'; return; }
+    finBusy = true; render();
+    var status = function (m) { var el = $('#fin-status'); if (el) el.textContent = m; };
+    var lim = {};
+    try { lim = await caps.sample.limits(); } catch (e) { /* лимиты по умолчанию */ }
+    var maxImg = lim.images ? lim.images.maxCount : 0, maxBytes = Math.max(8000, Math.min(40000, (lim.maxPromptBytes || 60000) - 12000));
+    var jobs = [];
+    if (text) chunkText(text, maxBytes).forEach(function (t) { jobs.push({ kind: 'текста', text: t, source: 'текст' }); });
+    for (var i = 0; i < finFiles.length; i++) {
+      var f = finFiles[i];
+      try {
+        if (/pdf$/i.test(f.type) || /\.pdf$/i.test(f.name)) {
+          status('Читаю ' + f.name + '…');
+          var r = await pdfToText(f, Math.max(1, maxImg));
+          if (r.text) chunkText(r.text, maxBytes).forEach(function (t) { jobs.push({ kind: 'банковской выписки', text: t, source: f.name }); });
+          else if (maxImg) jobs.push({ kind: 'скана выписки', images: r.images, source: f.name });
+        } else if (maxImg) {
+          var img = await shrinkImage(f, 1800).catch(function () { return f; });
+          jobs.push({ kind: 'фото чека или скриншота', images: [img], source: f.name });
+        }
+      } catch (e) { toast('Не прочитался файл ' + f.name + ': ' + e.message, true); }
+    }
+    var found = 0, failed = 0;
+    for (var j = 0; j < jobs.length; j++) {
+      status('Распознаю ' + (j + 1) + ' из ' + jobs.length + '…');
+      var job = jobs[j];
+      try {
+        var prompt = financePrompt(job.kind) + (job.text ? '\n\nДАННЫЕ:\n' + job.text : '');
+        var res = await caps.sample.json(prompt, job.images ? { images: job.images } : {});
+        (res && res.operations || []).forEach(function (op) { if (addStaged(op, job.source)) found++; });
+      } catch (e) {
+        failed++;
+        if (e && e.code === 'not_granted') { status('Нет разрешения на запрос к Claude.'); break; }
+        if (e && e.code === 'rate_limited') { status('Слишком много запросов, продолжите через минуту.'); break; }
+      }
+    }
+    finBusy = false; finFiles = []; render();
+    toast(found ? 'Найдено операций: ' + found + (failed ? ', не распознано частей: ' + failed : '') + '. Проверьте и сохраните.' : 'Операций не найдено' + (failed ? ' (ошибок: ' + failed + ')' : ''), !found);
+  }
+
+  function addStaged(op, source) {
+    var amount = Math.abs(parseFloat(String(op.amount).replace(/\s/g, '').replace(',', '.')));
+    if (!amount) return false;
+    var dir = op.direction === 'income' ? 'income' : 'expense';
+    var cat = C.CAT[op.category] ? op.category : (dir === 'income' ? 'income_other' : 'other');
+    if (C.CAT[cat].type === 'income' && dir === 'expense') cat = 'other';
+    if (C.CAT[cat].type === 'expense' && dir === 'income') cat = 'income_other';
+    var ord = op.orderNumber != null && S.orders.find(function (o) { return String(o.number) === String(op.orderNumber).replace(/\D/g, ''); });
+    var date = /^\d{4}-\d{2}-\d{2}$/.test(op.date || '') ? op.date : today();
+    var dup = S.transactions.concat(staged).some(function (t) { return t.date === date && Math.abs(+t.amount - amount) < 0.5; });
+    staged.push({ id: uid('tx'), date: date, amount: amount, direction: dir, category: cat, description: op.description || '', counterparty: op.counterparty || '',
+      orderId: ord ? ord.id : '', source: source, include: !dup && cat !== 'personal', dup: dup });
+    return true;
   }
 
   /* ================= Привязка полей ================= */
@@ -642,6 +1092,27 @@
       $('#ai-file-name').textContent = aiFile ? aiFile.name : 'Выбрать фото или эскиз';
     } else if (el.id === 'restore-file') {
       restore(el.files && el.files[0]);
+    } else if (el.id === 'logo-file') {
+      setLogo(el.files && el.files[0]);
+    } else if (el.dataset.xbind) {
+      var xb = el.dataset.xbind.split('|'); staged[xb[0]][xb[1]] = readVal(el);
+      if (xb[1] === 'category') { var c = C.CAT[staged[xb[0]].category]; staged[xb[0]].direction = c && c.type === 'income' ? 'income' : 'expense'; render(); }
+      else if (xb[1] === 'include') setOut('stage-count', String(staged.filter(function (x) { return x.include; }).length));
+    } else if (el.dataset.tx) {
+      var tb = el.dataset.tx.split('|'), t = S.transactions.find(function (x) { return x.id === tb[0]; });
+      if (!t) return;
+      t[tb[1]] = readVal(el);
+      if (tb[1] === 'category') { var cc = C.CAT[t.category]; t.direction = cc && cc.type === 'income' ? 'income' : 'expense'; }
+      later('tx-' + t.id, function () { Store.put('transactions', clone(t)); if (tb[1] !== 'description') render(); }, 500);
+    } else if (el.id === 'fin-month') {
+      finMonth = el.value || finMonth; render();
+    } else if (el.id === 'fin-cat') {
+      finCat = el.value; render();
+    } else if (el.id === 'coef-months') {
+      coefMonths = +el.value || 3; render();
+    } else if (el.id === 'fin-files') {
+      finFiles = Array.prototype.slice.call(el.files || []);
+      setOut('fin-files-name', finFiles.length ? finFiles.map(function (f) { return esc(f.name); }).join(', ') : 'Выбрать фото чеков или выписку (PDF)');
     }
   }
 
@@ -655,7 +1126,7 @@
       draft.items.push(itemFromTemplate(t)); saveDraft(); render();
     },
     'add-blank': function () {
-      draft.items.push({ id: uid('it'), name: 'Изделие', params: [], values: {}, count: 1, parts: [{ materialId: '', qty: '', note: '' }], laborHours: '' });
+      draft.items.push({ id: uid('it'), name: 'Изделие', params: [], values: {}, count: 1, parts: [{ materialId: '', n: '', len: '', qty: '', note: '' }], laborHours: '' });
       saveDraft(); render();
     },
     'ai-open': function () { aiOpen = true; render(); var t = $('#ai-text'); if (t) t.focus(); },
@@ -700,7 +1171,7 @@
     'open-order': function (b) {
       var o = S.orders.find(function (x) { return x.id === b.dataset.id; }); if (!o) return;
       draft = clone(o); delete draft.totals; delete draft.materialsSnapshot;
-      saveDraft(); view = 'calc'; render(); window.scrollTo(0, 0);
+      kpOpen = false; saveDraft(); view = 'calc'; render(); window.scrollTo(0, 0);
     },
     'copy-order': function (b) {
       var o = S.orders.find(function (x) { return x.id === b.dataset.id; }); if (!o) return;
@@ -741,7 +1212,47 @@
       caps.downloads.save({ filename: 'metal-calc-backup-' + new Date().toISOString().slice(0, 10) + '.json', data: JSON.stringify(S, null, 1) })
         .catch(function () { toast('Скачивание отменено', true); });
     },
-    'backup-copy': function () { copyText(JSON.stringify(S)); }
+    'backup-copy': function () { copyText(JSON.stringify(S)); },
+    'copy-cut': function () { copyText(cutText()); },
+    'kp-open': function () { kpOpen = true; render(); var k = $('#kp-preview'); if (k) k.scrollIntoView({ block: 'start' }); },
+    'kp-close': function () { kpOpen = false; render(); },
+    'kp-pdf': kpPdf,
+    'logo-del': function () { delete S.settings.logo; Store.saveSettings(); render(); },
+    'fin-run': runFinance,
+    'fin-filter': function (b) { finCat = finCat === b.dataset.id ? '' : b.dataset.id; render(); },
+    'stage-add': function () {
+      staged.push({ id: uid('tx'), date: today(), amount: '', direction: 'expense', category: 'metal', description: '', counterparty: '', orderId: '', source: 'вручную', include: true });
+      render();
+    },
+    'stage-clear': function () { staged = []; render(); },
+    'stage-save': function () {
+      var keep = staged.filter(function (x) { return x.include && +x.amount; });
+      keep.forEach(function (x) {
+        var t = clone(x); delete t.include; delete t.dup;
+        t.amount = Math.abs(+t.amount); t.createdAt = new Date().toISOString();
+        Store.put('transactions', t);
+      });
+      sortTx();
+      staged = []; render(); toast('Сохранено операций: ' + keep.length);
+    },
+    'del-tx': armedAction(function (id) { Store.remove('transactions', id); }),
+    'pf-add': function () {
+      var amt = parseFloat(String($('#pf-amount').value).replace(',', '.'));
+      if (!amt) return toast('Введите сумму', true);
+      var cat = $('#pf-cat').value, c = C.CAT[cat];
+      var t = { id: uid('tx'), date: today(), amount: Math.abs(amt), direction: c.type === 'income' ? 'income' : 'expense', category: cat,
+        description: $('#pf-desc').value || c.label, counterparty: '', orderId: draft.id, source: 'вручную', createdAt: new Date().toISOString() };
+      Store.put('transactions', t);
+      if (storeMode !== 'db') { sortTx(); render(); }
+      toast('Записано в заказ');
+    },
+    'coef-apply': function (b) {
+      S.settings[b.dataset.key] = Math.round(+b.dataset.val); Store.saveSettings(); render(); toast('Коэффициент обновлён');
+    },
+    'coef-fixed': function () {
+      var sug = C.suggestCoefficients(S.transactions, S.orders, S.settings, coefMonths);
+      S.settings.fixedCosts = sug.fixedCosts; Store.saveSettings(); render(); toast('Постоянные расходы заменены на средние по факту');
+    }
   };
 
   function armedAction(fn) {

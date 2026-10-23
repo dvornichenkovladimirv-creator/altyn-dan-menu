@@ -47,3 +47,65 @@ test('накладные на кг из постоянных расходов', 
   near(C.overheadPerKg({ fixedCosts: [{ amount: 300000 }, { amount: 60000 }], monthlyKg: 6000 }), 60);
   assert.strictEqual(C.overheadPerKg({ fixedCosts: [], monthlyKg: 0 }), 0);
 });
+
+test('деталь шт × длина', () => {
+  const r = C.partQty({ n: '4', len: 'H' }, { H: 2 });
+  assert.deepStrictEqual([r.value, r.n, r.len], [8, 4, 2]);
+  assert.strictEqual(C.partQty({ qty: '2*W' }, { W: 3 }).value, 6);
+});
+
+test('карта реза: укладка по хлыстам с учётом реза', () => {
+  const p = C.cutPlan([{ len: 2.9, label: 'a' }, { len: 2.9, label: 'a' }, { len: 3.1, label: 'b' }, { len: 2.5, label: 'c' }], 6, 3);
+  assert.strictEqual(p.bars.length, 2);
+  p.bars.forEach(b => {
+    const used = b.cuts.reduce((a, c) => a + c.len, 0) + (b.cuts.length - 1) * 0.003;
+    assert.ok(used <= 6 + 1e-9, 'не больше хлыста');
+  });
+  // 2,9 + 2,9 + рез > 5,8 — помещаются в один хлыст 6 м
+  assert.ok(p.bars.some(b => b.cuts.length === 2 && b.cuts.every(c => c.len === 2.9)));
+});
+
+test('карта реза: деталь длиннее хлыста стыкуется', () => {
+  const p = C.cutPlan([{ len: 7.5, label: 'прогон' }], 6, 3);
+  assert.strictEqual(p.joints, 1);
+  assert.strictEqual(p.bars.length, 2);
+});
+
+test('цена по позициям в сумме равна итогу', () => {
+  const s = C.DEFAULT_SETTINGS, mats = C.DEFAULT_MATERIALS;
+  const order = { items: C.DEFAULT_TEMPLATES.map(t => ({ ...t, values: {}, count: 1 })), options: { paint: true } };
+  const R = C.calcOrder(order, mats, s);
+  const parts = C.allocatePrice(R, order, s);
+  assert.strictEqual(parts.reduce((a, b) => a + b, 0), R.price);
+  assert.ok(parts.every(x => x > 0));
+});
+
+test('план против факта и коэффициенты по факту', () => {
+  const R = { price: 300000, rows: [{ key: 'metal', value: 100000 }, { key: 'waste', value: 7000 }, { key: 'fuel', value: 2000 }, { key: 'overhead', value: 9000 }] };
+  const tx = [
+    { orderId: 'o1', category: 'metal', amount: 120000 },
+    { orderId: 'o1', category: 'client', amount: 210000 },
+    { orderId: 'o1', category: 'personal', amount: 5000 },
+    { orderId: 'o2', category: 'metal', amount: 999 }
+  ];
+  const pf = C.planVsFact(R, tx, 'o1');
+  assert.strictEqual(pf.rows.find(r => r.id === 'metal').plan, 107000);
+  assert.strictEqual(pf.factDirect, 120000);
+  assert.strictEqual(pf.debt, 90000);
+
+  const today = new Date(2026, 9, 20);
+  const sug = C.suggestCoefficients([
+    { date: '2026-10-05', category: 'consumables', amount: 60000 },
+    { date: '2026-09-05', category: 'rent', amount: 300000 },
+    { date: '2026-01-01', category: 'rent', amount: 999999 }
+  ], [{ status: 'сдан', createdAt: '2026-10-01', totals: { kg: 1500 } }], C.DEFAULT_SETTINGS, 3, today);
+  assert.strictEqual(sug.rows.find(r => r.key === 'consumablesPerKg').fact, 40);
+  assert.strictEqual(sug.fixedCosts[0].amount, 100000);
+});
+
+test('шаблоны по умолчанию считаются без ошибок', () => {
+  C.DEFAULT_TEMPLATES.forEach(t => {
+    const r = C.calcItem({ ...t, values: {}, count: 1 }, C.DEFAULT_MATERIALS);
+    assert.strictEqual(r.errors, 0, t.name);
+  });
+});

@@ -153,11 +153,11 @@
     var count = Math.max(0, +item.count || 0);
     var lines = (item.parts || []).map(function (p) {
       var m = byId[p.materialId];
-      var q = tryFormula(p.qty, vars);
+      var q = partQty(p, vars);
       var qty = q.value;
-      if (!m) return { part: p, material: null, qty: qty, kg: 0, cost: 0, error: q.error || 'Материал не найден' };
-      var kg = qty * materialKg(m);
-      return { part: p, material: m, qty: qty, kg: kg, cost: qty * unitPrice(m), error: q.error };
+      var base = { part: p, material: m || null, qty: qty, n: q.n, len: q.len };
+      if (!m) return Object.assign(base, { kg: 0, cost: 0, error: q.error || 'Материал не найден' });
+      return Object.assign(base, { kg: qty * materialKg(m), cost: qty * unitPrice(m), error: q.error });
     });
     var hours = tryFormula(item.laborHours || 0, vars);
     var kgOne = sum(lines, 'kg'), costOne = sum(lines, 'cost');
@@ -170,6 +170,175 @@
       hours: hours.value * count,
       errors: lines.filter(function (l) { return l.error; }).length + (hours.error ? 1 : 0)
     };
+  }
+
+  // Деталь задаётся либо нарезкой (шт × длина), либо общим количеством
+  function hasCut(p) { return p.len != null && String(p.len).trim() !== ''; }
+  function partQty(p, vars) {
+    if (hasCut(p)) {
+      var n = tryFormula(p.n == null || String(p.n).trim() === '' ? 1 : p.n, vars);
+      var len = tryFormula(p.len, vars);
+      return { value: n.value * len.value, n: n.value, len: len.value, error: n.error || len.error };
+    }
+    var q = tryFormula(p.qty, vars);
+    return { value: q.value, n: null, len: null, error: q.error };
+  }
+
+  /* ---------- Карта реза: раскладка деталей по хлыстам ---------- */
+  // pieces: [{len (м), label}], stock — длина хлыста, м; kerf — ширина реза, мм.
+  // Best Fit Decreasing: каждую деталь (от длинных к коротким) кладём в хлыст с наименьшим остатком.
+  function cutPlan(pieces, stock, kerfMm) {
+    var kerf = (+kerfMm || 0) / 1000;
+    stock = +stock || 6;
+    var list = [], joints = 0;
+    pieces.forEach(function (p) {
+      var len = +p.len || 0;
+      if (len <= 0) return;
+      // Деталь длиннее хлыста — стыкуем из целых хлыстов и остатка
+      while (len > stock + 1e-9) { list.push({ len: stock, label: p.label + ' (часть)' }); len -= stock; joints++; }
+      if (len > 1e-6) list.push({ len: len, label: p.label });
+    });
+    list.sort(function (a, b) { return b.len - a.len; });
+    var bars = [];
+    list.forEach(function (pc) {
+      var best = null;
+      bars.forEach(function (b) {
+        var need = pc.len + (b.cuts.length ? kerf : 0);
+        if (b.rest + 1e-9 >= need && (!best || b.rest < best.rest)) best = b;
+      });
+      if (!best) { best = { cuts: [], rest: stock }; bars.push(best); }
+      best.rest -= pc.len + (best.cuts.length ? kerf : 0);
+      best.cuts.push(pc);
+    });
+    var used = list.reduce(function (a, x) { return a + x.len; }, 0);
+    bars.forEach(function (b) { b.rest = Math.max(0, b.rest); });
+    return {
+      stock: stock, bars: bars, used: used, joints: joints,
+      wastePct: bars.length ? (1 - used / (bars.length * stock)) * 100 : 0
+    };
+  }
+
+  function orderCutPlans(order, materials, s) {
+    var byId = {}, groups = {};
+    (materials || []).forEach(function (m) { byId[m.id] = m; });
+    (order.items || []).forEach(function (it) {
+      var vars = paramVars(it.params, it.values), cnt = Math.max(0, Math.round(+it.count || 0));
+      (it.parts || []).forEach(function (p) {
+        var m = byId[p.materialId];
+        if (!m || m.kind === 'sheet' || m.kind === 'custom') return;
+        var q = partQty(p, vars);
+        if (q.error || q.value <= 0) return;
+        var g = groups[m.id] = groups[m.id] || { material: m, pieces: [], uncut: 0 };
+        var label = (it.name || 'Изделие') + (p.note ? ': ' + p.note : '');
+        if (q.n != null) {
+          var n = Math.round(q.n) * cnt;
+          for (var i = 0; i < n; i++) g.pieces.push({ len: q.len, label: label });
+        } else {
+          // Нарезка не задана: считаем общей длиной, режем на хлысты как есть
+          for (var k = 0; k < cnt; k++) g.pieces.push({ len: q.value, label: label + ' (без нарезки)' });
+          g.uncut += q.value * cnt;
+        }
+      });
+    });
+    return Object.keys(groups).map(function (id) {
+      var g = groups[id];
+      var plan = cutPlan(g.pieces, g.material.stockLen || s.stockLen || 6, s.kerfMm == null ? 3 : s.kerfMm);
+      plan.material = g.material; plan.uncut = g.uncut;
+      return plan;
+    }).sort(function (a, b) { return a.material.name.localeCompare(b.material.name, 'ru', { numeric: true }); });
+  }
+
+  /* ---------- Цена по позициям для КП ---------- */
+  // Делим итоговую цену пропорционально прямым затратам позиции (металл + работы на кг)
+  function allocatePrice(R, order, s) {
+    var perKg = (+s.laborPerKg || 0) + (+s.consumablesPerKg || 0) +
+      (order.options && order.options.paint ? +s.paintPerKg || 0 : 0) +
+      (order.options && order.options.install ? +s.installPerKg || 0 : 0);
+    var bases = R.items.map(function (ir) { return ir.metalCost + ir.kg * perKg + ir.hours * (+s.hourRate || 0); });
+    var total = bases.reduce(function (a, b) { return a + b; }, 0);
+    var step = R.price >= 10000 ? 100 : 1, acc = 0;
+    return bases.map(function (b, i) {
+      if (i === bases.length - 1) return R.price - acc;
+      var v = total ? Math.round(R.price * b / total / step) * step : 0;
+      acc += v; return v;
+    });
+  }
+
+  /* ---------- Деньги: категории, факт по заказу, коэффициенты по факту ---------- */
+  var CATEGORIES = [
+    { id: 'client', label: 'Оплата от клиента', type: 'income' },
+    { id: 'income_other', label: 'Прочий доход', type: 'income' },
+    { id: 'metal', label: 'Металл и комплектующие', type: 'expense', plan: ['metal', 'waste'] },
+    { id: 'consumables', label: 'Расходники (электроды, диски, газ)', type: 'expense', plan: ['consum'], perKg: 'consumablesPerKg' },
+    { id: 'paint', label: 'Грунт и краска', type: 'expense', plan: ['paint'], perKg: 'paintPerKg' },
+    { id: 'labor', label: 'Зарплата, сдельная оплата', type: 'expense', plan: ['labor'], perKg: 'laborPerKg' },
+    { id: 'install', label: 'Монтаж (бригада, подряд)', type: 'expense', plan: ['install'], perKg: 'installPerKg' },
+    { id: 'fuel', label: 'Бензин', type: 'expense', plan: ['fuel'] },
+    { id: 'transport', label: 'Доставка, спецтехника, такси', type: 'expense', plan: ['trip'] },
+    { id: 'rent', label: 'Аренда', type: 'expense', fixed: true },
+    { id: 'utilities', label: 'Свет, связь, коммуналка', type: 'expense', fixed: true },
+    { id: 'equipment', label: 'Инструмент и оборудование', type: 'expense', fixed: true },
+    { id: 'ads', label: 'Реклама', type: 'expense', fixed: true },
+    { id: 'tax', label: 'Налоги, банк, комиссии', type: 'expense', fixed: true },
+    { id: 'other', label: 'Прочие расходы', type: 'expense', plan: ['extra'] },
+    { id: 'personal', label: 'Личное (не учитывать)', type: 'skip' }
+  ];
+  var CAT = {};
+  CATEGORIES.forEach(function (c) { CAT[c.id] = c; });
+
+  function factByOrder(transactions, orderId) {
+    var out = { income: 0, expense: 0, byCat: {} };
+    (transactions || []).forEach(function (t) {
+      if (t.orderId !== orderId) return;
+      var c = CAT[t.category] || CAT.other;
+      if (c.type === 'skip') return;
+      var a = Math.abs(+t.amount || 0);
+      if (c.type === 'income') out.income += a; else { out.expense += a; out.byCat[c.id] = (out.byCat[c.id] || 0) + a; }
+    });
+    return out;
+  }
+
+  // План (строки сметы) против факта (операции, привязанные к заказу), по категориям
+  function planVsFact(R, transactions, orderId) {
+    var f = factByOrder(transactions, orderId);
+    var rows = CATEGORIES.filter(function (c) { return c.type === 'expense'; }).map(function (c) {
+      var plan = R.rows.filter(function (r) {
+        return (c.plan || []).some(function (k) { return r.key === k || (k === 'extra' && r.key.indexOf('extra') === 0); });
+      }).reduce(function (a, r) { return a + r.value; }, 0);
+      return { id: c.id, label: c.label, plan: plan, fact: f.byCat[c.id] || 0 };
+    }).filter(function (r) { return r.plan || r.fact; });
+    var planDirect = rows.reduce(function (a, r) { return a + r.plan; }, 0);
+    return {
+      rows: rows, planDirect: planDirect, factDirect: f.expense,
+      paid: f.income, debt: R.price - f.income,
+      planProfit: R.price - planDirect, factProfit: R.price - f.expense
+    };
+  }
+
+  // Коэффициенты по фактическим расходам за последние N месяцев
+  function suggestCoefficients(transactions, orders, s, months, today) {
+    today = today || new Date();
+    var from = new Date(today.getFullYear(), today.getMonth() - months + 1, 1).toISOString().slice(0, 10);
+    var tx = (transactions || []).filter(function (t) { return (t.date || '') >= from; });
+    var kg = (orders || []).filter(function (o) {
+      return ['в работе', 'сдан'].indexOf(o.status) >= 0 && (o.createdAt || '').slice(0, 10) >= from;
+    }).reduce(function (a, o) { return a + (+(o.totals || {}).kg || 0); }, 0);
+    var byCat = {};
+    tx.forEach(function (t) {
+      var c = CAT[t.category];
+      if (c && c.type === 'expense') byCat[c.id] = (byCat[c.id] || 0) + Math.abs(+t.amount || 0);
+    });
+    var out = [];
+    CATEGORIES.forEach(function (c) {
+      if (c.perKg && byCat[c.id] && kg) {
+        out.push({ key: c.perKg, label: c.label + ', на 1 кг', current: +s[c.perKg] || 0, fact: byCat[c.id] / kg });
+      }
+    });
+    if (kg) out.push({ key: 'monthlyKg', label: 'Металла в месяц, кг', current: +s.monthlyKg || 0, fact: kg / months });
+    var fixed = CATEGORIES.filter(function (c) { return c.fixed && byCat[c.id]; }).map(function (c) {
+      return { name: c.label, amount: Math.round(byCat[c.id] / months) };
+    });
+    return { from: from, months: months, kg: kg, rows: out, fixedCosts: fixed, byCat: byCat };
   }
 
   /* ---------- Накладные из постоянных расходов ---------- */
@@ -288,8 +457,16 @@
       { name: 'Связь, реклама', amount: 40000 },
       { name: 'Амортизация оборудования', amount: 50000 }
     ],
+    stockLen: 6,
+    kerfMm: 3,
     company: 'Мой цех',
-    phone: ''
+    phone: '',
+    address: '',
+    bin: '',
+    leadDays: 10,
+    validDays: 7,
+    payTerms: 'Предоплата 70% на металл, остаток после монтажа',
+    warranty: 'Гарантия на сварные швы 12 месяцев'
   };
 
   var DEFAULT_TEMPLATES = [
@@ -297,9 +474,12 @@
       id: 'tpl-gate', name: 'Ворота распашные с профнастилом', category: 'Ворота',
       params: [{ key: 'W', label: 'Ширина проёма, м', def: 3.5 }, { key: 'H', label: 'Высота, м', def: 2 }],
       parts: [
-        { materialId: 'p60x40x2', qty: '2*W+4*H', note: 'рамы створок' },
-        { materialId: 'p40x20x2', qty: '2*W+2*H', note: 'обрешётка' },
-        { materialId: 'p80x80x3', qty: '2*(H+1)', note: 'столбы с заглублением 1 м' },
+        { materialId: 'p60x40x2', n: '4', len: 'H', note: 'стойки створок' },
+        { materialId: 'p60x40x2', n: '4', len: 'W/2', note: 'перемычки створок' },
+        { materialId: 'p40x20x2', n: '2', len: 'W/2', note: 'обрешётка, горизонт' },
+        { materialId: 'p40x20x2', n: '2', len: 'H', note: 'обрешётка, раскосы' },
+        { materialId: 'p40x20x2', n: '2', len: 'W/2', note: 'обрешётка, низ' },
+        { materialId: 'p80x80x3', n: '2', len: 'H+1', note: 'столбы с заглублением 1 м' },
         { materialId: 'prof045', qty: 'W*H*1.1', note: 'обшивка +10% на нахлёст' },
         { materialId: 'hinge', qty: '4', note: '' }
       ],
@@ -309,9 +489,9 @@
       id: 'tpl-canopy', name: 'Навес односкатный', category: 'Навесы',
       params: [{ key: 'L', label: 'Длина, м', def: 6 }, { key: 'B', label: 'Вынос, м', def: 4 }, { key: 'H', label: 'Высота столбов, м', def: 2.7 }],
       parts: [
-        { materialId: 'p80x80x3', qty: '(ceil(L/3)+1)*2*(H+0.8)', note: 'столбы, шаг 3 м' },
-        { materialId: 'p60x40x2', qty: '2*L', note: 'прогоны по столбам' },
-        { materialId: 'p40x20x2', qty: '(ceil(L/0.8)+1)*B', note: 'обрешётка шаг 0,8 м' },
+        { materialId: 'p80x80x3', n: '(ceil(L/3)+1)*2', len: 'H+0.8', note: 'столбы, шаг 3 м' },
+        { materialId: 'p60x40x2', n: '2', len: 'L', note: 'прогоны по столбам' },
+        { materialId: 'p40x20x2', n: 'ceil(L/0.8)+1', len: 'B', note: 'обрешётка шаг 0,8 м' },
         { materialId: 'prof045', qty: 'L*B*1.1', note: 'кровля' },
         { materialId: 'anchor', qty: '(ceil(L/3)+1)*2', note: '' }
       ],
@@ -321,8 +501,9 @@
       id: 'tpl-railing', name: 'Перила лестницы', category: 'Ограждения',
       params: [{ key: 'L', label: 'Длина, м', def: 4 }],
       parts: [
-        { materialId: 'p40x40x2', qty: 'L+(ceil(L/1)+1)*0.9', note: 'поручень + стойки шаг 1 м' },
-        { materialId: 'p20x20x2', qty: 'ceil(L/0.12)*0.8', note: 'балясины шаг 12 см' }
+        { materialId: 'p40x40x2', n: '1', len: 'L', note: 'поручень' },
+        { materialId: 'p40x40x2', n: 'ceil(L/1)+1', len: '0.9', note: 'стойки шаг 1 м' },
+        { materialId: 'p20x20x2', n: 'ceil(L/0.12)', len: '0.8', note: 'балясины шаг 12 см' }
       ],
       laborHours: '0'
     }
@@ -332,6 +513,8 @@
     kgPerUnit: kgPerUnit, materialKg: materialKg, unitPrice: unitPrice, unitOf: unitOf,
     evalFormula: evalFormula, tryFormula: tryFormula, paramVars: paramVars,
     calcItem: calcItem, calcOrder: calcOrder, overheadPerKg: overheadPerKg,
+    hasCut: hasCut, partQty: partQty, cutPlan: cutPlan, orderCutPlans: orderCutPlans, allocatePrice: allocatePrice,
+    CATEGORIES: CATEGORIES, CAT: CAT, factByOrder: factByOrder, planVsFact: planVsFact, suggestCoefficients: suggestCoefficients,
     fmtNum: fmtNum, roundTo: roundTo,
     DEFAULT_MATERIALS: DEFAULT_MATERIALS, DEFAULT_SETTINGS: DEFAULT_SETTINGS, DEFAULT_TEMPLATES: DEFAULT_TEMPLATES
   };
