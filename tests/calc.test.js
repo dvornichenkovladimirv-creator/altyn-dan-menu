@@ -148,17 +148,20 @@ test('швеллер: вес вручную, режется по карте ре
   assert.strictEqual(plans[0].bars.length, 2);
 });
 
-test('работа сварщика — ставка за метр в изделии, не за кг', () => {
+test('перила нерж.: ставка сварщика за метр, сплошные ригели, соединители на повороты', () => {
   const mats = require('../data/pricelist-imex-trade.json').items;
-  const t = require('../data/template-railing-aisi201.json');
-  const it = { ...t, values: { L: 4 }, count: 2 };
+  const t = require('../data/template-railing-ss201-51.json');
+  const it = { ...t, values: { L: 8, P: 3 }, count: 1 };
   const r = C.calcItem(it, mats);
   assert.strictEqual(r.errors, 0);
-  assert.strictEqual(r.work, 2 * 4 * 4000);
+  assert.strictEqual(r.work, 8 * 4000);
+  const q = re => r.lines.find(l => re.test(l.part.note)).qty;
+  assert.strictEqual(q(/соединители поручня/), 3 + 1, '3 поворота + 1 стык хлыстов на 8 м');
+  assert.strictEqual(q(/соединители ригелей/), 12);
+  assert.strictEqual(q(/заглушки ригелей/), 6);
+  const rig = r.lines.find(l => /ригели/.test(l.part.note));
+  assert.deepStrictEqual([rig.n, rig.len], [3, 8]);
   const o = C.calcOrder({ items: [it], options: { install: true } }, mats, C.DEFAULT_SETTINGS);
   assert.strictEqual(o.rows.find(x => x.key === 'labor').value, 32000);
-  assert.strictEqual(o.rows.find(x => x.key === 'install'), undefined, 'монтаж на кг по умолчанию 0');
-  const rig = r.lines.find(l => /ригели/.test(l.part.note));
-  assert.strictEqual(rig.n, 12);
-  assert.ok(Math.abs(rig.len - (1 - 0.0508)) < 1e-9);
+  for (const k of ['38', '32']) assert.strictEqual(C.calcItem({ ...require('../data/template-railing-ss201-' + k + '.json'), values: {}, count: 1 }, mats).errors, 0, k);
 });
