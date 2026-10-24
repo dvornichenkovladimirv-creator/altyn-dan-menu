@@ -162,6 +162,8 @@
       return Object.assign(base, { kg: qty * materialKg(m), cost: qty * unitPrice(m), error: q.error });
     });
     var hours = tryFormula(item.laborHours || 0, vars);
+    // Работа сварщика в тенге на изделие: обычно за метр или м² (L*4000), изготовление + монтаж
+    var work = tryFormula(item.laborCost || 0, vars);
     var kgOne = sum(lines, 'kg'), costOne = sum(lines, 'cost');
     // Отходы считаем только на прокат, который режется: не на петли, замки и т.п.
     var cutCost = sum(lines.filter(function (l) { return l.material && l.material.kind !== 'custom'; }), 'cost');
@@ -171,7 +173,8 @@
       kgOne: kgOne, costOne: costOne,
       kg: kgOne * count, metalCost: costOne * count, cutCost: cutCost * count, barCost: barCost * count,
       hours: hours.value * count,
-      errors: lines.filter(function (l) { return l.error; }).length + (hours.error ? 1 : 0)
+      work: work.value * count, workOne: work.value,
+      errors: lines.filter(function (l) { return l.error; }).length + (hours.error ? 1 : 0) + (work.error ? 1 : 0)
     };
   }
 
@@ -257,7 +260,7 @@
     var perKg = (+s.laborPerKg || 0) + (+s.consumablesPerKg || 0) +
       (order.options && order.options.paint ? +s.paintPerKg || 0 : 0) +
       (order.options && order.options.install ? +s.installPerKg || 0 : 0);
-    var bases = R.items.map(function (ir) { return ir.metalCost + ir.kg * perKg + ir.hours * (+s.hourRate || 0); });
+    var bases = R.items.map(function (ir) { return ir.metalCost + ir.kg * perKg + ir.hours * (+s.hourRate || 0) + (ir.work || 0); });
     var total = bases.reduce(function (a, b) { return a + b; }, 0);
     var step = R.price >= 10000 ? 100 : 1, acc = 0;
     return bases.map(function (b, i) {
@@ -412,12 +415,14 @@
     add('consum', 'Расходники (электроды, диски, газ)', kgGross * (+s.consumablesPerKg || 0), fmtNum(s.consumablesPerKg) + '/кг');
     if (o.paint) add('paint', 'Грунт и покраска', kgGross * (+s.paintPerKg || 0), fmtNum(s.paintPerKg) + '/кг');
 
-    var hours = sum(items, 'hours');
-    var labor = kg * (+s.laborPerKg || 0) + hours * (+s.hourRate || 0);
-    add('labor', 'Работа (изготовление)', labor,
-      fmtNum(s.laborPerKg) + '/кг' + (hours ? ' + ' + fmtNum(hours, 1) + ' ч' : ''));
+    var hours = sum(items, 'hours'), work = sum(items, 'work');
+    var labor = kg * (+s.laborPerKg || 0) + hours * (+s.hourRate || 0) + work;
+    add('labor', 'Работа сварщика', labor, [
+      work ? 'по ставке изделия' : '',
+      +s.laborPerKg ? fmtNum(s.laborPerKg) + '/кг' : '',
+      hours ? fmtNum(hours, 1) + ' ч' : ''].filter(Boolean).join(' + '));
     if (o.install) {
-      add('install', 'Монтаж', kg * (+s.installPerKg || 0) + (+o.installExtra || 0), fmtNum(s.installPerKg) + '/кг');
+      add('install', 'Монтаж (сверх ставки сварщика)', kg * (+s.installPerKg || 0) + (+o.installExtra || 0), +s.installPerKg ? fmtNum(s.installPerKg) + '/кг' : '');
     }
 
     var trips = +o.trips || 0, km = +o.distanceKm || 0;
@@ -487,9 +492,9 @@
     wastePct: 7,
     consumablesPerKg: 40,
     paintPerKg: 60,
-    laborPerKg: 350,
+    laborPerKg: 0,
     hourRate: 3000,
-    installPerKg: 150,
+    installPerKg: 0,
     fuelPrice: 240,
     fuelPer100: 14,
     tripFixed: 3000,
@@ -534,7 +539,8 @@
         { materialId: 'prof045', qty: 'W*H*1.1', note: 'обшивка +10% на нахлёст' },
         { materialId: 'hinge', qty: '4', note: '' }
       ],
-      laborHours: '0'
+      laborCost: 'W*H*10000',
+      laborHours: ''
     },
     {
       id: 'tpl-canopy', name: 'Навес односкатный', category: 'Навесы',
@@ -546,7 +552,8 @@
         { materialId: 'prof045', qty: 'L*B*1.1', note: 'кровля' },
         { materialId: 'anchor', qty: '(ceil(L/3)+1)*2', note: '' }
       ],
-      laborHours: '0'
+      laborCost: 'L*B*7500',
+      laborHours: ''
     },
     {
       id: 'tpl-railing', name: 'Перила лестницы', category: 'Ограждения',
@@ -556,7 +563,8 @@
         { materialId: 'p40x40x2', n: 'ceil(L/1)+1', len: '0.9', note: 'стойки шаг 1 м' },
         { materialId: 'p20x20x2', n: 'ceil(L/0.12)', len: '0.8', note: 'балясины шаг 12 см' }
       ],
-      laborHours: '0'
+      laborCost: 'L*6000',
+      laborHours: ''
     }
   ];
 

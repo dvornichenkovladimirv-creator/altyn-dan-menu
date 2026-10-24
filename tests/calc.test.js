@@ -147,3 +147,18 @@ test('швеллер: вес вручную, режется по карте ре
   const plans = C.orderCutPlans({ items: [{ name: 'Рама', count: 1, parts: [{ materialId: 's', n: '3', len: '2.5' }] }] }, [m], C.DEFAULT_SETTINGS);
   assert.strictEqual(plans[0].bars.length, 2);
 });
+
+test('работа сварщика — ставка за метр в изделии, не за кг', () => {
+  const mats = require('../data/pricelist-imex-trade.json').items;
+  const t = require('../data/template-railing-aisi201.json');
+  const it = { ...t, values: { L: 4 }, count: 2 };
+  const r = C.calcItem(it, mats);
+  assert.strictEqual(r.errors, 0);
+  assert.strictEqual(r.work, 2 * 4 * 4000);
+  const o = C.calcOrder({ items: [it], options: { install: true } }, mats, C.DEFAULT_SETTINGS);
+  assert.strictEqual(o.rows.find(x => x.key === 'labor').value, 32000);
+  assert.strictEqual(o.rows.find(x => x.key === 'install'), undefined, 'монтаж на кг по умолчанию 0');
+  const rig = r.lines.find(l => /ригели/.test(l.part.note));
+  assert.strictEqual(rig.n, 12);
+  assert.ok(Math.abs(rig.len - (1 - 0.0508)) < 1e-9);
+});

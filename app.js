@@ -301,7 +301,8 @@
       '<tbody>' + parts + '</tbody></table></div>' +
       '<div class="item-foot">' +
         '<span class="hint">' + hint + '</span>' +
-        '<label class="hours">Доп. часы работы <input id="it-' + i + '-h" class="formula short" data-bind="items.' + i + '.laborHours" value="' + esc(it.laborHours || '') + '" placeholder="0"></label>' +
+        '<label class="hours">Работа сварщика, ' + cur() + ' <input id="it-' + i + '-w" class="formula" data-bind="items.' + i + '.laborCost" value="' + esc(it.laborCost || '') + '" placeholder="L*4000"></label>' +
+        '<span class="work-out" data-out="w-' + i + '"></span>' +
         '<span class="item-total" data-out="it-' + i + '"></span>' +
       '</div>' +
       '<div class="item-actions">' +
@@ -327,7 +328,8 @@
         setOut('kg-' + i + '-' + j, l.error ? '<span class="err" title="' + esc(l.error) + '">ошибка</span>' : C.fmtNum(l.kg, 1));
         setOut('c-' + i + '-' + j, l.error ? '' : n0(l.cost) + '<small>' + C.fmtNum(l.qty, 2) + ' ' + esc(l.material ? l.material.unit : '') + '</small>');
       });
-      setOut('it-' + i, C.fmtNum(ir.kg, 1) + ' кг · металл ' + money(ir.metalCost));
+      setOut('w-' + i, ir.workOne ? '= ' + money(ir.workOne) : '');
+      setOut('it-' + i, C.fmtNum(ir.kg, 1) + ' кг · металл ' + money(ir.metalCost) + (ir.work ? ' · работа ' + money(ir.work) : ''));
     });
 
     var rows = R.rows.map(function (r) {
@@ -432,12 +434,14 @@
       'ШАБЛОНЫ цеха (id | название | параметры | детали с формулами):\n' + (tpls || '(нет)') + '\n\n' +
       'КАТАЛОГ материалов (id | название | единица | вес):\n' + catalog + '\n\n' +
       'Правила:\n' +
+      '- Мастер называет трубы условно: «51-я» = Ø50,8; «38-я» = Ø38,1; «32-я» = Ø31,8; «25-я» = Ø25; «16-я» = Ø15,9; «19-я» = Ø19; «63-я» = Ø63; «102-я» = Ø101,6.\n' +
+      '- Работа считается не на кг, а ставкой сварщика за метр или м² (изготовление + монтаж): верни laborCost — формулу в тенге от параметров или числом (например "L*4000"), если мастер назвал ставку; иначе пустую строку.\n' +
       '- Если изделие по смыслу совпадает с шаблоном, верни templateId и values (числа в метрах для каждого параметра), parts оставь пустым.\n' +
       '- Иначе templateId = null и перечисли детали: materialId строго из каталога. Для труб, уголка, арматуры укажи n (штук) и len (длина одной детали, м) — по ним строится карта реза. Для листа, профнастила и штучного — qty (м² или шт).\n' +
       '- Размеры, которых не видно, прими типовыми и запиши в assumptions. Не выдумывай материалы вне каталога: если нужного нет, возьми ближайший и укажи это в assumptions.\n' +
       '- Учитывай столбы с заглублением, перемычки, рёбра жёсткости, обшивку.\n\n' +
       'Ответь ТОЛЬКО JSON без пояснений:\n' +
-      '{"name": "краткое название изделия", "count": 1, "templateId": "id или null", "values": {"W": 3.5}, ' +
+      '{"name": "краткое название изделия", "count": 1, "templateId": "id или null", "values": {"W": 3.5}, "laborCost": "", ' +
       '"parts": [{"materialId": "id", "n": 4, "len": 2.0, "note": "стойки"}, {"materialId": "id", "qty": 7.7, "note": "обшивка"}], "assumptions": ["…"], "questions": ["что уточнить у клиента"]}';
 
     var opts = { modelTier: 'complex' };
@@ -456,6 +460,7 @@
           }) };
       }
       it.count = Math.max(1, +r.count || 1);
+      if (r.laborCost) it.laborCost = String(r.laborCost);
       var notes = [];
       if (r.assumptions && r.assumptions.length) notes.push('Допущения: ' + r.assumptions.join('; '));
       if (r.questions && r.questions.length) notes.push('Уточнить: ' + r.questions.join('; '));
@@ -571,7 +576,7 @@
       '<p class="muted">Для трубы и уголка задавайте штуки и длину одной детали: по ним строится карта реза. Пример: 4 шт × <code>H</code> — стойки, <code>ceil(L/0,8)+1</code> шт × <code>B</code> — обрешётка с шагом 0,8 м. Для листа, профнастила и фурнитуры — колонка «всего» (<code>W*H*1,1</code>, <code>4</code>). Функции: <code>ceil</code>, <code>round</code>, <code>max(H;2)</code>.</p>' +
       '<div class="scroll"><table class="parts"><thead><tr><th>Материал</th><th>Шт</th><th>Длина, м</th><th>или всего</th><th class="num">При значениях по умолчанию</th><th>Примечание</th><th></th></tr></thead><tbody>' + parts + '</tbody></table></div>' +
       '<button class="btn ghost" data-action="tpl-add-part">+ деталь</button>' +
-      '<div class="field short-field">' + '<label class="lbl" for="tp-h">Доп. часы работы (формула)</label><input id="tp-h" class="formula" data-tbind="laborHours" value="' + esc(t.laborHours || '') + '"></div>' +
+      '<div class="field short-field">' + '<label class="lbl" for="tp-w">Работа сварщика, ' + cur() + ' (изготовление + монтаж)</label><input id="tp-w" class="formula" data-tbind="laborCost" value="' + esc(t.laborCost || '') + '" placeholder="L*4000"><small class="muted">Ставка за метр × длина, например <code>L*4000</code>, или за м²: <code>W*H*10000</code></small></div>' +
       '<div class="tpl-total" data-out="tpl-total"></div>' +
     '</section>';
   }
@@ -584,7 +589,7 @@
       setOut('tq-' + j, l.error ? '<span class="err" title="' + esc(l.error) + '">' + esc(l.error) + '</span>' :
         C.fmtNum(l.qty, 2) + ' ' + esc(l.material ? l.material.unit : '') + ' · ' + C.fmtNum(l.kg, 1) + ' кг');
     });
-    setOut('tpl-total', 'Итого при значениях по умолчанию: <b>' + C.fmtNum(r.kg, 1) + ' кг</b>, металл <b>' + money(r.metalCost) + '</b>' +
+    setOut('tpl-total', 'Итого при значениях по умолчанию: <b>' + C.fmtNum(r.kg, 1) + ' кг</b>, металл <b>' + money(r.metalCost) + '</b>' + (r.work ? ', работа сварщика <b>' + money(r.work) + '</b>' : '') +
       (r.errors ? ' · <span class="err">ошибок: ' + r.errors + '</span>' : ''));
   }
 
@@ -665,9 +670,9 @@
           num('wastePct', 'Отходы и обрезки, %', 'надбавка к металлу') +
           num('consumablesPerKg', 'Расходники на 1 кг', 'электроды, диски, газ, проволока') +
           num('paintPerKg', 'Грунт и краска на 1 кг', 'если в заказе отмечена покраска') +
-          num('laborPerKg', 'Работа сварщика на 1 кг', 'сдельная оплата за изготовление') +
+          num('laborPerKg', 'Работа на 1 кг (обычно 0)', 'работа задаётся в изделии: ставка за метр или м²') +
           num('hourRate', 'Ставка часа', 'для доп. часов в изделии') +
-          num('installPerKg', 'Монтаж на 1 кг', 'если в заказе отмечен монтаж') +
+          num('installPerKg', 'Монтаж на 1 кг (обычно 0)', 'монтаж входит в ставку сварщика в изделии') +
           num('stockLen', 'Длина хлыста по умолчанию, м', 'можно задать свою у каждого профиля') +
           num('kerfMm', 'Ширина реза, мм', 'диск 1,6–3 мм') +
         '</div>' +
@@ -1295,7 +1300,7 @@
       var t = {
         id: existing ? existing.id : uid('tpl'), name: it.name, category: existing ? existing.category : '',
         params: clone(it.params || []).map(function (p) { p.def = C.paramVars(it.params, it.values)[p.key]; return p; }),
-        parts: clone(it.parts).filter(function (p) { return p.materialId; }), laborHours: it.laborHours || ''
+        parts: clone(it.parts).filter(function (p) { return p.materialId; }), laborHours: it.laborHours || '', laborCost: it.laborCost || ''
       };
       it.templateId = t.id;
       Store.put('templates', t); saveDraft(); render();
