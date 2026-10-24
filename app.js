@@ -135,7 +135,7 @@
     return {
       id: uid('ord'), number: '', client: '', phone: '', address: '', note: '',
       status: 'расчёт', items: [], extras: [],
-      options: { paint: true, install: true, trips: 1, distanceKm: 15, marginPct: '', discountPct: 0 }
+      options: { paint: false, install: true, trips: 1, distanceKm: 15, marginPct: '', discountPct: 0 }
     };
   }
   function saveDraft() { lsSet(LS_DRAFT, draft); }
