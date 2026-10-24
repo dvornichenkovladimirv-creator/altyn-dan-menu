@@ -79,7 +79,7 @@
       "note": "фланец d51 под чашкой (ч/м, скрыт)"
     },
     {
-      "materialId": "imx-a7e35634",
+      "materialId": "anchor-m8",
       "qty": "3*(ceil(L/S)+1)",
       "note": "анкеры, 3 на фланец"
     }

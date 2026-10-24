@@ -247,6 +247,7 @@
             field('Расстояние в одну сторону, км', '<input id="o-km" type="number" min="0" data-bind="options.distanceKm" data-num value="' + esc(o.distanceKm) + '">') +
             field('Наценка, % (пусто = ' + esc(S.settings.marginPct) + ')', '<input id="o-margin" type="number" data-bind="options.marginPct" value="' + esc(o.marginPct) + '">') +
             field('Скидка клиенту, %', '<input id="o-disc" type="number" min="0" max="100" data-bind="options.discountPct" data-num value="' + esc(o.discountPct) + '">') +
+            field('Доставка, ' + cur() + ' (газель, такси)', '<input id="o-deliv" type="number" min="0" data-bind="options.delivery" data-num value="' + esc(o.delivery || '') + '" placeholder="0">') +
             field('Монтаж: доп. сумма', '<input id="o-instx" type="number" min="0" data-bind="options.installExtra" data-num value="' + esc(o.installExtra || '') + '">') +
           '</div>' +
           '<h3>Прочие расходы по заказу</h3>' +
@@ -668,7 +669,8 @@
         '<p class="muted">Всё, что меняется от веса изделия, задаётся на 1 кг металла. Так один раз настроили — и любое изделие считается одинаково.</p>' +
         '<div class="grid3">' +
           num('wastePct', 'Отходы и обрезки, %', 'надбавка к металлу') +
-          num('consumablesPerKg', 'Расходники на 1 кг', 'электроды, диски, газ, проволока') +
+          num('consumablesPct', 'Расходники, % от себестоимости', 'электроды, диски, газ, вольфрам; берётся от всего: металл, фурнитура, работа, доставка') +
+          num('consumablesPerKg', 'Расходники на 1 кг (обычно 0)', 'если хотите считать по весу') +
           num('paintPerKg', 'Грунт и краска на 1 кг', 'если в заказе отмечена покраска') +
           num('laborPerKg', 'Работа на 1 кг (обычно 0)', 'работа задаётся в изделии: ставка за метр или м²') +
           num('hourRate', 'Ставка часа', 'для доп. часов в изделии') +

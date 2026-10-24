@@ -74,12 +74,12 @@
       "note": "чашка сферы 38 снизу, закрывает фланец"
     },
     {
-      "materialId": "imx-de74994c",
+      "materialId": "imx-9403ab0c",
       "qty": "(ceil(L/S)+1)",
-      "note": "фланец AISI201 d38 под чашкой"
+      "note": "фланец d38 под чашкой (ч/м, скрыт)"
     },
     {
-      "materialId": "imx-a7e35634",
+      "materialId": "anchor-m8",
       "qty": "3*(ceil(L/S)+1)",
       "note": "анкеры, 3 на фланец"
     }

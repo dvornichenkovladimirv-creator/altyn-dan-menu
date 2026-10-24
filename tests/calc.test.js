@@ -96,10 +96,11 @@ test('план против факта и коэффициенты по факт
   const today = new Date(2026, 9, 20);
   const sug = C.suggestCoefficients([
     { date: '2026-10-05', category: 'consumables', amount: 60000 },
+    { date: '2026-10-06', category: 'metal', amount: 600000 },
     { date: '2026-09-05', category: 'rent', amount: 300000 },
     { date: '2026-01-01', category: 'rent', amount: 999999 }
   ], [{ status: 'сдан', createdAt: '2026-10-01', totals: { kg: 1500 } }], C.DEFAULT_SETTINGS, 3, today);
-  assert.strictEqual(sug.rows.find(r => r.key === 'consumablesPerKg').fact, 40);
+  assert.strictEqual(sug.rows.find(r => r.key === 'consumablesPct').fact, 10);
   assert.strictEqual(sug.fixedCosts[0].amount, 100000);
 });
 
@@ -149,7 +150,7 @@ test('швеллер: вес вручную, режется по карте ре
 });
 
 test('перила нерж.: ставка сварщика за метр, сплошные ригели, соединители на повороты', () => {
-  const mats = require('../data/pricelist-imex-trade.json').items;
+  const mats = require('../data/pricelist-imex-trade.json').items.concat([require('../data/material-anchor-m8.json')]);
   const t = require('../data/template-railing-ss201-51.json');
   const it = { ...t, values: { L: 8, P: 3 }, count: 1 };
   const r = C.calcItem(it, mats);
@@ -166,4 +167,14 @@ test('перила нерж.: ставка сварщика за метр, сп�
   for (const k of ['38', '51-32']) assert.strictEqual(C.calcItem({ ...require('../data/template-railing-ss201-' + k + '.json'), values: {}, count: 1 }, mats).errors, 0, k);
   const t38 = require('../data/template-railing-ss201-38.json');
   assert.ok(t38.parts.every(p => !/d51|50,8/.test(mats.find(m => m.id === p.materialId).name)), 'в шаблоне 38 нет деталей на 51');
+});
+
+test('расходники 10% от всей себестоимости, включая доставку', () => {
+  const mats = [{ id: 'x', name: 'Фурнитура', kind: 'custom', price: 1000, priceMode: 'unit', unit: 'шт', kgPerUnit: 0 }];
+  const s = { ...C.DEFAULT_SETTINGS, fixedCosts: [], tripFixed: 0, consumablesPct: 10 };
+  const o = C.calcOrder({ items: [{ name: 'a', count: 1, parts: [{ materialId: 'x', qty: '10' }], laborCost: '5000' }], options: { delivery: 5000 } }, mats, s);
+  const row = k => (o.rows.find(r => r.key === k) || {}).value;
+  assert.strictEqual(row('delivery'), 5000);
+  assert.strictEqual(row('consum'), (10000 + 5000 + 5000) * 0.1);
+  assert.strictEqual(o.cost, 22000);
 });

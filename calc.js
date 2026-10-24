@@ -275,12 +275,12 @@
     { id: 'client', label: 'Оплата от клиента', type: 'income' },
     { id: 'income_other', label: 'Прочий доход', type: 'income' },
     { id: 'metal', label: 'Металл и комплектующие', type: 'expense', plan: ['metal', 'waste'] },
-    { id: 'consumables', label: 'Расходники (электроды, диски, газ)', type: 'expense', plan: ['consum'], perKg: 'consumablesPerKg' },
+    { id: 'consumables', label: 'Расходники (электроды, диски, газ)', type: 'expense', plan: ['consum', 'consum-kg'] },
     { id: 'paint', label: 'Грунт и краска', type: 'expense', plan: ['paint'], perKg: 'paintPerKg' },
     { id: 'labor', label: 'Зарплата, сдельная оплата', type: 'expense', plan: ['labor'], perKg: 'laborPerKg' },
     { id: 'install', label: 'Монтаж (бригада, подряд)', type: 'expense', plan: ['install'], perKg: 'installPerKg' },
     { id: 'fuel', label: 'Бензин', type: 'expense', plan: ['fuel'] },
-    { id: 'transport', label: 'Доставка, спецтехника, такси', type: 'expense', plan: ['trip'] },
+    { id: 'transport', label: 'Доставка, спецтехника, такси', type: 'expense', plan: ['trip', 'delivery'] },
     { id: 'rent', label: 'Аренда', type: 'expense', fixed: true },
     { id: 'utilities', label: 'Свет, связь, коммуналка', type: 'expense', fixed: true },
     { id: 'equipment', label: 'Инструмент и оборудование', type: 'expense', fixed: true },
@@ -340,6 +340,10 @@
         out.push({ key: c.perKg, label: c.label + ', на 1 кг', current: +s[c.perKg] || 0, fact: byCat[c.id] / kg });
       }
     });
+    // Расходники — процент от остальных прямых расходов
+    var direct = CATEGORIES.filter(function (c) { return c.type === 'expense' && !c.fixed && c.id !== 'consumables'; })
+      .reduce(function (a, c) { return a + (byCat[c.id] || 0); }, 0);
+    if (byCat.consumables && direct) out.push({ key: 'consumablesPct', label: 'Расходники, % от себестоимости', current: +s.consumablesPct || 0, fact: byCat.consumables / direct * 100 });
     if (kg) out.push({ key: 'monthlyKg', label: 'Металла в месяц, кг', current: +s.monthlyKg || 0, fact: kg / months });
     var fixed = CATEGORIES.filter(function (c) { return c.fixed && byCat[c.id]; }).map(function (c) {
       return { name: c.label, amount: Math.round(byCat[c.id] / months) };
@@ -412,7 +416,7 @@
 
     add('metal', 'Металл', metalRaw, fmtNum(kg, 1) + ' кг' + barsNote);
     add('waste', 'Обрезки и отходы', waste, (s.wastePct || 0) + '%');
-    add('consum', 'Расходники (электроды, диски, газ)', kgGross * (+s.consumablesPerKg || 0), fmtNum(s.consumablesPerKg) + '/кг');
+    if (+s.consumablesPerKg) add('consum-kg', 'Расходники на кг', kgGross * (+s.consumablesPerKg || 0), fmtNum(s.consumablesPerKg) + '/кг');
     if (o.paint) add('paint', 'Грунт и покраска', kgGross * (+s.paintPerKg || 0), fmtNum(s.paintPerKg) + '/кг');
 
     var hours = sum(items, 'hours'), work = sum(items, 'work');
@@ -425,6 +429,7 @@
       add('install', 'Монтаж (сверх ставки сварщика)', kg * (+s.installPerKg || 0) + (+o.installExtra || 0), +s.installPerKg ? fmtNum(s.installPerKg) + '/кг' : '');
     }
 
+    add('delivery', 'Доставка', +o.delivery || 0, 'по заказу');
     var trips = +o.trips || 0, km = +o.distanceKm || 0;
     var fuel = trips * km * 2 / 100 * (+s.fuelPer100 || 0) * (+s.fuelPrice || 0);
     add('fuel', 'Бензин', fuel, trips ? trips + ' рейс × ' + km + ' км туда-обратно' : '');
@@ -437,6 +442,9 @@
       add('extra' + idx, e.name || 'Прочее', +e.amount || 0, 'доп.');
     });
 
+    // Расходники (электроды, диски, газ, вольфрам) — процент от всей себестоимости, включая доставку и фурнитуру
+    var pct = +s.consumablesPct || 0;
+    if (pct) add('consum', 'Расходники', sum(rows, 'value') * pct / 100, pct + '% от себестоимости');
     var cost = sum(rows, 'value');
     var marginPct = o.marginPct != null && o.marginPct !== '' ? +o.marginPct : (+s.marginPct || 0);
     var margin = cost * marginPct / 100;
@@ -490,7 +498,8 @@
   var DEFAULT_SETTINGS = {
     currency: '₸',
     wastePct: 7,
-    consumablesPerKg: 40,
+    consumablesPerKg: 0,
+    consumablesPct: 10,
     paintPerKg: 60,
     laborPerKg: 0,
     hourRate: 3000,

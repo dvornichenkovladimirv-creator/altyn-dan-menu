@@ -2,13 +2,14 @@
 //   38 — стойка и поручень «38-я» (38,1), чашки и фланец 38;
 //   51 — стойка и поручень «51-я» (50,8), чашки и фланец 51;
 //   51-32 — как 51 плюс второй поручень «32-я» (31,8) — ограждение для маломобильных.
+// Фланцы — чёрный металл (скрыты чашкой). Анкер — своя цена (материал anchor-m8).
 // node tools/build-railing-templates.js — пишет data/template-railing-ss201-*.json
 const fs = require('fs'), path = require('path');
 const D = {
   '51': { size: '50,8', pipe: 'imx-494c1bc0', cap: 'imx-e4251dd8', joint: 'imx-05981780',
     cupTop: 'imx-288eca88', cupBottom: 'imx-ae49c2d7', flange: 'imx-70098c54', flangeNote: 'фланец d51 под чашкой (ч/м, скрыт)', postCut: 0.06 },
   '38': { size: '38,1', pipe: 'imx-c1217b58', cap: 'imx-fea135b2', joint: 'imx-9a291a1f',
-    cupTop: 'imx-063abb9a', cupBottom: 'imx-34c1d8ba', flange: 'imx-de74994c', flangeNote: 'фланец AISI201 d38 под чашкой', postCut: 0.05 },
+    cupTop: 'imx-063abb9a', cupBottom: 'imx-34c1d8ba', flange: 'imx-9403ab0c', flangeNote: 'фланец d38 под чашкой (ч/м, скрыт)', postCut: 0.05 },
   '32': { size: '31,8', pipe: 'imx-118ddf55', cap: 'imx-278d4f71', joint: 'imx-41ea9cfe' }
 };
 const JOINTS = '(P+max(ceil(L/6)-1;0))'; // стыки: повороты + стыки хлыстов по 6 м
@@ -26,12 +27,12 @@ function railing(post, extra) {
     { materialId: p.cupTop, qty: POSTS, note: 'чашка стойки HIGH ' + post + ' сверху' },
     { materialId: p.cupBottom, qty: POSTS, note: 'чашка сферы ' + post + ' снизу, закрывает фланец' },
     { materialId: p.flange, qty: POSTS, note: p.flangeNote },
-    { materialId: 'imx-a7e35634', qty: '3*' + POSTS, note: 'анкеры, 3 на фланец' }
+    { materialId: 'anchor-m8', qty: '3*' + POSTS, note: 'анкеры, 3 на фланец' }
   ];
   if (extra) {
     const e = D[extra];
     parts.splice(3, 0,
-      { materialId: e.pipe, n: '1', len: 'L', note: 'второй поручень «' + extra + '-я» для маломобильных' },
+      { materialId: e.pipe, n: '1', len: 'L', note: 'второй поручень «' + extra + '-я» для маломобильных, приваривается к стойкам напрямую' },
       { materialId: e.cap, qty: '2', note: 'заглушки второго поручня' },
       { materialId: e.joint, qty: JOINTS, note: 'соединители второго поручня' });
   }
