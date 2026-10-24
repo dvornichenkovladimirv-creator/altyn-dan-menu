@@ -1,0 +1,24 @@
+{
+  "id": "tpl-railing-ss201",
+  "name": "Перила нерж. AISI201, 3 ригеля",
+  "category": "Ограждения",
+  "params": [
+    { "key": "L", "label": "Длина ограждения, м", "def": 4 },
+    { "key": "H", "label": "Высота, м", "def": 0.95 },
+    { "key": "S", "label": "Шаг стоек, м", "def": 1 }
+  ],
+  "parts": [
+    { "materialId": "imx-494c1bc0", "n": "1", "len": "L", "note": "поручень (в прайсе IMEX нет Ø58, взят 50,8)" },
+    { "materialId": "imx-494c1bc0", "n": "ceil(L/S)+1", "len": "H-0.06", "note": "стойки: высота минус поручень и чашка" },
+    { "materialId": "imx-a98d6e3f", "n": "3", "len": "L", "note": "ригели, сквозные" },
+    { "materialId": "imx-e4251dd8", "qty": "2", "note": "заглушки поручня" },
+    { "materialId": "imx-8ee7c798", "qty": "6", "note": "заглушки ригелей" },
+    { "materialId": "imx-288eca88", "qty": "ceil(L/S)+1", "note": "чашка стойки сверху" },
+    { "materialId": "imx-ae49c2d7", "qty": "ceil(L/S)+1", "note": "чашка сферы снизу" },
+    { "materialId": "imx-70098c54", "qty": "ceil(L/S)+1", "note": "фланец под чашкой (ч/м, скрыт)" },
+    { "materialId": "imx-a7e35634", "qty": "3*(ceil(L/S)+1)", "note": "анкеры, 3 на фланец" },
+    { "materialId": "imx-05981780", "qty": "max(ceil(L/6)-1;0)", "note": "соединители поручня, если длиннее 6 м" },
+    { "materialId": "imx-052f8da3", "qty": "3*max(ceil(L/6)-1;0)", "note": "соединители ригелей" }
+  ],
+  "laborHours": "L*2.5"
+}
