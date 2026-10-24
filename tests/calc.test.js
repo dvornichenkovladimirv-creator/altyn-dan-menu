@@ -163,5 +163,7 @@ test('перила нерж.: ставка сварщика за метр, сп�
   assert.deepStrictEqual([rig.n, rig.len], [3, 8]);
   const o = C.calcOrder({ items: [it], options: { install: true } }, mats, C.DEFAULT_SETTINGS);
   assert.strictEqual(o.rows.find(x => x.key === 'labor').value, 32000);
-  for (const k of ['38', '32']) assert.strictEqual(C.calcItem({ ...require('../data/template-railing-ss201-' + k + '.json'), values: {}, count: 1 }, mats).errors, 0, k);
+  for (const k of ['38', '51-32']) assert.strictEqual(C.calcItem({ ...require('../data/template-railing-ss201-' + k + '.json'), values: {}, count: 1 }, mats).errors, 0, k);
+  const t38 = require('../data/template-railing-ss201-38.json');
+  assert.ok(t38.parts.every(p => !/d51|50,8/.test(mats.find(m => m.id === p.materialId).name)), 'в шаблоне 38 нет деталей на 51');
 });
