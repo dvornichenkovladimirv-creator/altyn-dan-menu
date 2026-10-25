@@ -3,7 +3,7 @@ const cfg = $('Разбор сообщения').first().json;
 const rows = $json.valueRanges?.[0]?.values || $json.values || [];
 const get = (label) => (rows.find((r) => r[0] === label) || [])[1] || '—';
 const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-const money = (n) => Math.round(Number(n)).toLocaleString('ru-RU').replace(/ /g, ' ') + ' ₸';
+const money = (n) => Math.round(Number(n)).toLocaleString('ru-RU').replace(/\u00a0/g, ' ') + ' ₸';
 const ru = (iso) => (iso && /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso.split('-').reverse().join('.') : esc(iso));
 const safe = (name) => {
   try {
@@ -17,6 +17,25 @@ const tax = get('Итого к уплате, ₸');
 const taxLine = `💰 Налог к уплате сейчас: <b>${esc(tax)} ₸</b>`;
 const sheetUrl = `https://docs.google.com/spreadsheets/d/${cfg.sheet}/edit`;
 
+// Порог НДС: строка в сводке, а при 75% и больше ещё и в каждом ответе
+const pctRaw = get('Использовано порога');
+const pct = parseFloat(String(pctRaw).replace(',', '.'));
+const vatLimit = get('Порог постановки на учёт по НДС, ₸');
+const vatLeft = get('Осталось до порога, ₸');
+let vatLine;
+if (Number.isNaN(pct)) {
+  vatLine = '⚪ Порог НДС: впишите в таблицу оборот с 1 января до начала периода (лист «Итог», жёлтая ячейка).';
+} else if (pct >= 100) {
+  vatLine = `🔴 <b>Порог НДС (${esc(vatLimit)} ₸) превышен.</b> Заявление о постановке на учёт по НДС нужно подать в течение 5 рабочих дней с даты превышения. Свяжитесь с бухгалтером.`;
+} else if (pct >= 90) {
+  vatLine = `🟠 <b>Порог НДС: использовано ${esc(pctRaw)}</b>, осталось ${esc(vatLeft)} ₸. Перед каждым крупным заказом проверяйте остаток.`;
+} else if (pct >= 75) {
+  vatLine = `🟡 Порог НДС: использовано ${esc(pctRaw)}, осталось ${esc(vatLeft)} ₸.`;
+} else {
+  vatLine = `🟢 Порог НДС: использовано ${esc(pctRaw)}, осталось ${esc(vatLeft)} ₸.`;
+}
+const vatAlert = !Number.isNaN(pct) && pct >= 75;
+
 const pad = (label, value) => label.padEnd(14, ' ') + String(value).padStart(13, ' ') + ' ₸';
 const summary = [
   `<b>📊 Налог ИП «МК» с ${esc(get('Начало периода'))}</b>`,
@@ -29,6 +48,7 @@ const summary = [
   ].map(esc).join('\n') + '</pre>',
   `<b>Итого к уплате: ${esc(tax)} ₸</b>`,
   `Чеков за период: ${esc(get('Чеков за период'))}, из них без вашего ИИН: ${esc(get('Чеков без ИИН покупателя'))}`,
+  vatLine,
   '',
   '<b>📌 Дальше пришлите:</b>',
   `• выписку Kaspi с <b>${esc(get('Следующая выписка с'))}</b>`,
@@ -55,6 +75,7 @@ if (cfg.route === 'check') {
   }
   if (parsed.error) lines.push(`Ошибка распознавания: ${esc(parsed.error)}`);
   lines.push('', taxLine);
+  if (vatAlert) lines.push(vatLine);
   messages.push(lines.join('\n'));
 } else if (cfg.route === 'pdf' && (safe('Новые поступления') || {}).invalid) {
   const r = safe('Новые поступления');
@@ -78,6 +99,7 @@ if (cfg.route === 'check') {
   }
   for (const c of r.skipped) lines.push(`➖ Не доход (${esc(c.why)}): ${ru(c.date)} ${money(c.amount)}`);
   lines.push('✔️ Сверка с «Итого обороты» сошлась.', '', taxLine);
+  if (vatAlert) lines.push(vatLine);
   messages.push(lines.join('\n'));
   messages.push(summary);
 } else if (cfg.route === 'reminder') {
@@ -87,6 +109,7 @@ if (cfg.route === 'check') {
     `• чеки с <b>${esc(get('Следующие чеки с'))}</b>`,
     '',
     taxLine,
+    vatLine,
   ].join('\n'));
 } else {
   const t = cfg.text.toLowerCase();

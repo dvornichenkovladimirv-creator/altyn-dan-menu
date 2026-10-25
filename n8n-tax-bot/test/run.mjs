@@ -68,6 +68,8 @@ const itog = { valueRanges: [{ values: [
   ['Доходы за период, ₸', '3 003 530'], ['Расходы по чекам за период, ₸', '699 373'], ['Налогооблагаемая база, ₸', '2 304 157'],
   ['ИПН, ₸', '230 416'], ['Итого к уплате, ₸', '376 416'], [], ['Выписка учтена по', '21.10.2026'], ['Следующая выписка с', '22.10.2026'],
   ['Чеков за период', '29'], ['Чеков без ИИН покупателя', '12'], ['Последний чек от', '24.10.2026'], ['Следующие чеки с', '25.10.2026'],
+  [], [], [], ['Порог НДС'], ['Оборот с 1 января до начала периода, ₸'], ['МРП 2026, ₸', '4 325'],
+  ['Порог постановки на учёт по НДС, МРП', '10 000'], ['Порог постановки на учёт по НДС, ₸', '43 250 000'],
 ] }] };
 out = await run('08_messages.js', { json: itog });
 assert.equal(out.length, 1);
@@ -143,6 +145,25 @@ assert.equal(out[0].json.st.credits.length, 0);
   assert.match(out[0].json.text, /Напоминание/);
   assert.match(out[0].json.text, /22\.10\.2026/);
   console.log('\n--- напоминание ---\n' + out[0].json.text);
+}
+
+// Порог НДС: пусто -> просьба вписать; 76% -> жёлтое предупреждение и в коротких ответах; 100% -> красное
+{
+  const withVat = (pct, left) => ({ valueRanges: [{ values: [...itog.valueRanges[0].values,
+    ['Оборот с начала года, ₸', 'x'], ['Использовано порога', pct], ['Осталось до порога, ₸', left]] }] });
+  nodeOut['Разбор сообщения'] = { ...nodeOut['Разбор сообщения'], route: 'command', text: '/итог' };
+  out = await run('08_messages.js', { json: itog });
+  assert.match(out[0].json.text, /впишите в таблицу оборот/);
+  out = await run('08_messages.js', { json: withVat('76,3%', '10 246 470') });
+  assert.match(out[0].json.text, /🟡 Порог НДС: использовано 76,3%, осталось 10 246 470 ₸/);
+  nodeOut['Разбор сообщения'] = { ...nodeOut['Разбор сообщения'], route: 'check' };
+  out = await run('08_messages.js', { json: withVat('76,3%', '10 246 470') });
+  assert.match(out[0].json.text, /🟡/);
+  out = await run('08_messages.js', { json: withVat('40,0%', '25 950 000') });
+  assert.doesNotMatch(out[0].json.text, /Порог НДС/);
+  out = await run('08_messages.js', { json: withVat('101,2%', '0') });
+  assert.match(out[0].json.text, /🔴 <b>Порог НДС \(43 250 000 ₸\) превышен/);
+  console.log('\n--- порог превышен ---\n' + out[0].json.text);
 }
 
 console.log('\nВсе проверки пройдены');

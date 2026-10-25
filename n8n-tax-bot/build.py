@@ -162,7 +162,7 @@ nodes = [
     sheets_append("Доходы: добавить", "'Доходы'!A:F", "$('Новые поступления').first().json.body", [2440, 260]),
     sheets_append("Выписки: записать", "'Выписки'!A:F", "$('Новые поступления').first().json.logBody", [2660, 340]),
     # итог
-    sheets_get("Итог: прочитать", ["'Итог'!A4:B20"], [2880, 300], execute_once=True),
+    sheets_get("Итог: прочитать", ["'Итог'!A4:B31"], [2880, 300], execute_once=True),
     code("Сообщения", "08_messages.js", [3100, 300]),
     tg_send("Ответ", "={{ $json.chatId }}", "={{ $json.text }}", [3320, 300]),
     tg_send(
