@@ -1,0 +1,687 @@
+{
+  "name": "Налоговый бот ИП МК",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "name": "Telegram",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        300
+      ],
+      "id": "2bb29250-f1e4-58b0-b7e8-c080d3f8424f"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ===== НАСТРОЙКИ =====\n// ID Google-таблицы «Налоги ИП МК» (из ссылки на таблицу)\nconst SHEET_ID = '1epYsyQoB1FgexKBqlWgGdriKxeO86hXDe0_VYL9EzdY';\n// Кому бот отвечает. Узнать свой chat id: напишите боту что угодно, он пришлёт номер.\nconst ALLOWED_CHAT_IDS = [];\n// Модель OpenAI с распознаванием изображений\nconst MODEL = 'gpt-5.5';\n// =====================\n\nconst m = $json.message || {};\nconst chatId = String(m.chat?.id ?? '');\nlet route = 'command';\nlet fileId = null;\nlet fileName = '';\n\nif (m.photo && m.photo.length) {\n  route = 'check';\n  fileId = m.photo[m.photo.length - 1].file_id; // самое большое разрешение\n} else if (m.document) {\n  const mime = String(m.document.mime_type || '').toLowerCase();\n  fileName = m.document.file_name || '';\n  const name = fileName.toLowerCase();\n  fileId = m.document.file_id;\n  if (mime.startsWith('image/')) route = 'check';\n  else if (mime === 'application/pdf' || name.endsWith('.pdf')) route = 'pdf';\n  else if (name.endsWith('.xlsx') || name.endsWith('.xls') || mime.includes('spreadsheet') || mime.includes('excel')) route = 'xlsx';\n  else route = 'unknown';\n}\n\nif (!ALLOWED_CHAT_IDS.includes(chatId)) route = 'denied';\n\nreturn [{\n  json: {\n    chatId,\n    route,\n    fileId,\n    fileName,\n    text: String(m.text || m.caption || '').trim(),\n    sheet: SHEET_ID,\n    model: MODEL,\n  },\n}];\n"
+      },
+      "name": "Разбор сообщения",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ],
+      "id": "4c065867-39fe-5748-8e68-70cf5aff3ed1"
+    },
+    {
+      "parameters": {
+        "mode": "expression",
+        "numberOutputs": 4,
+        "output": "={{ ({check: 0, pdf: 1, denied: 3})[$json.route] ?? 2 }}"
+      },
+      "name": "Маршрут",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        440,
+        300
+      ],
+      "id": "1e856d12-e3c7-59cb-90c3-ded320782e97"
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $json.fileId }}",
+        "additionalFields": {}
+      },
+      "name": "Скачать фото",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        680,
+        0
+      ],
+      "id": "2d9caee4-219f-53b7-988e-960952daab59"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Готовит запрос в OpenAI: фото чека -> JSON с реквизитами\nconst item = $input.first();\nif (!item.binary || !item.binary.data) throw new Error('Telegram не отдал файл чека');\nconst buf = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst cfg = $('Разбор сообщения').first().json;\nconst mimeType = String(item.binary.data.mimeType || '');\nconst mime = mimeType.startsWith('image/') ? mimeType : 'image/jpeg';\n\nconst prompt = `Ты бухгалтер ИП в Казахстане. На фото один или несколько фискальных чеков или накладных. Покупатель: ИП «МК», ИИН 870727350990.\nВерни JSON строго такого вида:\n{\"docs\":[{\"date\":\"YYYY-MM-DD\",\"seller\":\"название продавца\",\"seller_bin\":\"БИН/ИИН продавца, 12 цифр, или пустая строка\",\"items\":\"кратко что куплено, по-русски, до 80 символов\",\"total\":12345.67,\"fp\":\"фискальный признак (ФП/ФБ), а если его нет, номер чека или накладной\",\"buyer_iin\":true,\"readable\":true}]}\nПравила:\n- total: итоговая сумма документа (ИТОГ / ЖИЫНЫ / БАРЛЫҒЫ / Сумма оплаты). Не сумма внесённых наличных и не сдача.\n- buyer_iin: true, только если в документе напечатан ИИН покупателя 870727350990.\n- Если документ не читается или не видно суммы и даты, readable=false.\n- Ничего не придумывай. Одна запись на один документ.`;\n\nreturn [{\n  json: {\n    body: {\n      model: cfg.model,\n      response_format: { type: 'json_object' },\n      messages: [{\n        role: 'user',\n        content: [\n          { type: 'text', text: prompt },\n          { type: 'image_url', image_url: { url: `data:${mime};base64,${buf.toString('base64')}` } },\n        ],\n      }],\n    },\n  },\n}];\n"
+      },
+      "name": "Запрос: чек",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        0
+      ],
+      "id": "192f7f37-bbfd-5465-9680-cf57a8d3cce6"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "timeout": 180000
+        }
+      },
+      "name": "OpenAI: чек",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1120,
+        0
+      ],
+      "onError": "continueRegularOutput",
+      "id": "63cb59ad-fa8e-58eb-bc80-d8ffd2918f9e"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Достаёт список документов из ответа OpenAI\nconst content = $json.choices?.[0]?.message?.content || '';\nlet docs = [];\nlet error = '';\ntry {\n  docs = JSON.parse(content).docs || [];\n} catch (e) {\n  error = $json.error?.message || 'OpenAI не вернул данные';\n}\nreturn [{ json: { docs, error } }];\n"
+      },
+      "name": "Чеки из ответа",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        0
+      ],
+      "id": "c59c96c8-3ca7-5299-be1b-6886a1a4a4a3"
+    },
+    {
+      "parameters": {
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{ $('Разбор сообщения').first().json.sheet }}/values:batchGet?ranges={{ encodeURIComponent(\"'Расходы'!A2:H\") }}&ranges={{ encodeURIComponent(\"'Итог'!B4\") }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {}
+      },
+      "name": "Расходы: прочитать",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1560,
+        0
+      ],
+      "id": "dee9abb6-b52b-55cc-936e-da61f5850a86"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Сверяет распознанные чеки с листом «Расходы» и готовит строки для добавления\nconst { docs } = $('Чеки из ответа').first().json;\nconst ranges = $json.valueRanges || [];\nconst rows = ranges[0]?.values || [];\nconst startRaw = ranges[1]?.values?.[0]?.[0] || '';\n\nconst toIso = (s) => {\n  const m = String(s).match(/(\\d{2})\\.(\\d{2})\\.(\\d{4})/);\n  return m ? `${m[3]}-${m[2]}-${m[1]}` : String(s);\n};\nconst digits = (s) => String(s || '').replace(/\\D/g, '');\nconst num = (s) => parseFloat(String(s).replace(/[\\s ]/g, '').replace(',', '.')) || 0;\n\nconst startIso = toIso(startRaw);\nconst knownFp = new Set(rows.map((r) => digits(r[5])).filter(Boolean));\nconst knownDateSum = new Set(rows.map((r) => `${toIso(r[0])}|${Math.round(num(r[4]))}`));\n\nconst values = [];\nconst added = [];\nconst dups = [];\nconst bad = [];\n\nfor (const d of docs) {\n  const total = Number(d.total);\n  if (!d.readable || !total || !/^\\d{4}-\\d{2}-\\d{2}$/.test(String(d.date || ''))) {\n    bad.push(d);\n    continue;\n  }\n  const fp = digits(d.fp);\n  const dateSum = `${d.date}|${Math.round(total)}`;\n  if ((fp && knownFp.has(fp)) || (!fp && knownDateSum.has(dateSum))) {\n    dups.push(d);\n    continue;\n  }\n  if (fp) knownFp.add(fp);\n  knownDateSum.add(dateSum);\n\n  const [y, mo, da] = d.date.split('-');\n  values.push([\n    `${da}.${mo}.${y}`,\n    d.seller || '',\n    d.seller_bin ? \"'\" + digits(d.seller_bin) : '',\n    d.items || '',\n    total,\n    \"'\" + String(d.fp || ''),\n    d.buyer_iin ? 'да' : 'нет',\n    'бот',\n  ]);\n  added.push({ ...d, total, outOfPeriod: Boolean(startIso && d.date < startIso) });\n}\n\nreturn [{ json: { skip: values.length === 0, body: { values }, added, dups, bad } }];\n"
+      },
+      "name": "Новые чеки",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1780,
+        0
+      ],
+      "id": "9291ce73-d5f5-51f5-b242-502b08c56c71"
+    },
+    {
+      "parameters": {
+        "mode": "expression",
+        "numberOutputs": 2,
+        "output": "={{ $json.skip ? 1 : 0 }}"
+      },
+      "name": "Есть новые чеки?",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        2000,
+        0
+      ],
+      "id": "d85d5650-4d7b-5f4e-9ebc-4a38ca262362"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{ $('Разбор сообщения').first().json.sheet }}/values/{{ encodeURIComponent(\"'Расходы'!A:H\") }}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Новые чеки').first().json.body) }}",
+        "options": {}
+      },
+      "name": "Расходы: добавить",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2220,
+        -80
+      ],
+      "executeOnce": true,
+      "id": "c32f3618-dced-5cb9-ae3c-f9d40f2a4494"
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $json.fileId }}",
+        "additionalFields": {}
+      },
+      "name": "Скачать PDF",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        680,
+        340
+      ],
+      "id": "bc7bfc0b-181d-5b5b-a24b-d60fa1501818"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Готовит запрос в OpenAI: PDF-выписка Kaspi -> JSON с поступлениями.\n// PDF отправляется файлом целиком: так модель видит колонки «Дебет» и «Кредит» и не путает их.\nconst item = $input.first();\nif (!item.binary || !item.binary.data) throw new Error('Telegram не отдал файл выписки');\nconst buf = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst cfg = $('Разбор сообщения').first().json;\n\nconst prompt = `Это банковская выписка Kaspi Bank по счёту ИП. Верни JSON строго такого вида:\n{\"period_from\":\"YYYY-MM-DD\",\"period_to\":\"YYYY-MM-DD\",\"last_operation\":\"YYYY-MM-DD\",\"opening_balance\":0,\"closing_balance\":0,\"total_debit\":0,\"total_credit\":0,\"credit_count\":0,\"credits\":[{\"doc\":\"номер документа\",\"date\":\"YYYY-MM-DD\",\"sender\":\"название отправителя без БИН/ИИН\",\"amount\":0,\"knp\":\"КНП\",\"purpose\":\"назначение платежа, кратко, до 80 символов\"}]}\nПравила:\n- last_operation: «Дата последнего движения» из шапки.\n- credits: все операции с суммой в колонке «Кредит» (поступления на счёт). Списания не включай.\n- total_debit, total_credit и credit_count бери из строк «Итого обороты» и «Итого операций за период» в конце выписки.\n- Суммы переписывай точно, без округления, числом.`;\n\nreturn [{\n  json: {\n    body: {\n      model: cfg.model,\n      reasoning_effort: 'low',\n      response_format: { type: 'json_object' },\n      messages: [\n        { role: 'system', content: prompt },\n        {\n          role: 'user',\n          content: [{\n            type: 'file',\n            file: { filename: 'statement.pdf', file_data: `data:application/pdf;base64,${buf.toString('base64')}` },\n          }],\n        },\n      ],\n    },\n  },\n}];\n"
+      },
+      "name": "Запрос: выписка",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        340
+      ],
+      "id": "6e582ee7-f544-5778-89e7-0821959cbfcf"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "timeout": 180000
+        }
+      },
+      "name": "OpenAI: выписка",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1340,
+        340
+      ],
+      "onError": "continueRegularOutput",
+      "id": "453f74cc-31ee-547c-a0f2-5fc85553eefb"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Достаёт данные выписки из ответа OpenAI\nconst content = $json.choices?.[0]?.message?.content || '';\nlet st = null;\nlet error = '';\ntry {\n  st = JSON.parse(content);\n} catch (e) {\n  error = $json.error?.message || 'OpenAI не вернул данные';\n}\nif (!st || !Array.isArray(st.credits)) {\n  st = { credits: [] };\n  error = error || 'в выписке не нашлось поступлений';\n}\nreturn [{ json: { st, error } }];\n"
+      },
+      "name": "Поступления из ответа",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        340
+      ],
+      "id": "c3e3f978-5eae-5c02-b0b2-843176936ae6"
+    },
+    {
+      "parameters": {
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{ $('Разбор сообщения').first().json.sheet }}/values:batchGet?ranges={{ encodeURIComponent(\"'Доходы'!A2:F\") }}&ranges={{ encodeURIComponent(\"'Итог'!B4\") }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {}
+      },
+      "name": "Доходы: прочитать",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1780,
+        340
+      ],
+      "id": "9e33d125-4201-5e79-9015-3dd2f8266b8c"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Отбирает новые поступления за период и готовит строки для листов «Доходы» и «Выписки»\nconst { st, error } = $('Поступления из ответа').first().json;\nconst ranges = $json.valueRanges || [];\nconst rows = ranges[0]?.values || [];\nconst startRaw = ranges[1]?.values?.[0]?.[0] || '';\n\nconst toIso = (s) => {\n  const m = String(s).match(/(\\d{2})\\.(\\d{2})\\.(\\d{4})/);\n  return m ? `${m[3]}-${m[2]}-${m[1]}` : String(s);\n};\nconst ru = (iso) => (iso && /^\\d{4}-\\d{2}-\\d{2}$/.test(iso) ? iso.split('-').reverse().join('.') : '');\nconst startIso = toIso(startRaw);\nconst known = new Set(rows.map((r) => String(r[5] || '').trim()));\n\nconst values = [];\nconst added = [];\nconst skipped = [];\n\nfor (const c of st.credits || []) {\n  const amount = Number(c.amount);\n  if (!amount || !/^\\d{4}-\\d{2}-\\d{2}$/.test(String(c.date || ''))) continue;\n  if (startIso && c.date < startIso) continue; // до начала периода, уже посчитано ранее\n  const purpose = String(c.purpose || '');\n  const p = purpose.toLowerCase();\n  if (String(c.knp) === '342' || p.includes('собственных средств')) {\n    skipped.push({ ...c, amount, why: 'перевод своих денег' });\n    continue;\n  }\n  if (p.includes('отмена') || p.includes('возврат')) {\n    skipped.push({ ...c, amount, why: 'возврат покупки' });\n    continue;\n  }\n  const key = `${String(c.doc || '').trim()}|${c.date}|${amount}`;\n  if (known.has(key)) continue; // уже есть в таблице\n  known.add(key);\n  values.push([ru(c.date), c.sender || '', amount, purpose, \"'\" + String(c.doc || ''), \"'\" + key]);\n  added.push({ ...c, amount });\n}\n\n// Сверка: все поступления из выписки должны совпасть с итоговой строкой «Итого обороты»\nconst sum = added.reduce((s, c) => s + c.amount, 0);\nconst round2 = (x) => Math.round(Number(x) * 100) / 100;\nconst credits = st.credits || [];\nconst allCredits = round2(credits.reduce((s, c) => s + Number(c.amount || 0), 0));\nconst problems = [];\nif (typeof st.total_credit !== 'number' || allCredits !== round2(st.total_credit)) {\n  problems.push(`сумма поступлений ${allCredits} не равна итогу по кредиту ${st.total_credit}`);\n}\nif (typeof st.credit_count === 'number' && credits.length !== st.credit_count) {\n  problems.push(`найдено ${credits.length} поступлений, а в итоге выписки ${st.credit_count}`);\n}\nif ([st.opening_balance, st.closing_balance, st.total_debit, st.total_credit].every((x) => typeof x === 'number')\n  && round2(st.opening_balance + st.total_credit - st.total_debit) !== round2(st.closing_balance)) {\n  problems.push('остатки не сходятся');\n}\nconst invalid = Boolean(error) || problems.length > 0;\nconst check = invalid ? 'НЕ сходится' : 'сходится';\nconst today = $now.setZone('Asia/Almaty').toFormat('dd.MM.yyyy');\nconst lastOp = st.last_operation || st.period_to || '';\n\nreturn [{\n  json: {\n    invalid,\n    problems,\n    skip: values.length === 0,\n    body: { values },\n    logBody: { values: [[today, ru(st.period_from), ru(lastOp), added.length, sum, check]] },\n    added,\n    skipped,\n    sum,\n    check,\n    periodFrom: ru(st.period_from),\n    lastOp: ru(lastOp),\n    error,\n  },\n}];\n"
+      },
+      "name": "Новые поступления",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        340
+      ],
+      "id": "7a015dd1-9eb3-5534-8ff0-3ce2965f7d23"
+    },
+    {
+      "parameters": {
+        "mode": "expression",
+        "numberOutputs": 3,
+        "output": "={{ $json.invalid ? 2 : ($json.skip ? 1 : 0) }}"
+      },
+      "name": "Есть новые поступления?",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        2220,
+        340
+      ],
+      "id": "e315a82e-483e-5633-903b-4577669d6d64"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{ $('Разбор сообщения').first().json.sheet }}/values/{{ encodeURIComponent(\"'Доходы'!A:F\") }}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Новые поступления').first().json.body) }}",
+        "options": {}
+      },
+      "name": "Доходы: добавить",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2440,
+        260
+      ],
+      "executeOnce": true,
+      "id": "c9b81f91-b09e-5812-b869-5d5163fb52bd"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{ $('Разбор сообщения').first().json.sheet }}/values/{{ encodeURIComponent(\"'Выписки'!A:F\") }}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Новые поступления').first().json.logBody) }}",
+        "options": {}
+      },
+      "name": "Выписки: записать",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2660,
+        340
+      ],
+      "executeOnce": true,
+      "id": "ab7b24d7-1e8a-5df7-88e8-6b67efaf12a8"
+    },
+    {
+      "parameters": {
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{ $('Разбор сообщения').first().json.sheet }}/values:batchGet?ranges={{ encodeURIComponent(\"'Итог'!A4:B20\") }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {}
+      },
+      "name": "Итог: прочитать",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2880,
+        300
+      ],
+      "executeOnce": true,
+      "id": "b5e77dd5-5fdf-5dc4-8e9f-13ae6309773b"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Собирает ответные сообщения в Telegram (HTML-разметка)\nconst cfg = $('Разбор сообщения').first().json;\nconst rows = $json.values || [];\nconst get = (label) => (rows.find((r) => r[0] === label) || [])[1] || '—';\nconst esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst money = (n) => Math.round(Number(n)).toLocaleString('ru-RU').replace(/ /g, ' ') + ' ₸';\nconst ru = (iso) => (iso && /^\\d{4}-\\d{2}-\\d{2}$/.test(iso) ? iso.split('-').reverse().join('.') : esc(iso));\nconst safe = (name) => {\n  try {\n    return $(name).first().json;\n  } catch (e) {\n    return null;\n  }\n};\n\nconst tax = get('Итого к уплате, ₸');\nconst taxLine = `💰 Налог к уплате сейчас: <b>${esc(tax)} ₸</b>`;\nconst sheetUrl = `https://docs.google.com/spreadsheets/d/${cfg.sheet}/edit`;\n\nconst pad = (label, value) => label.padEnd(14, ' ') + String(value).padStart(13, ' ') + ' ₸';\nconst summary = [\n  `<b>📊 Налог ИП «МК» с ${esc(get('Начало периода'))}</b>`,\n  '<pre>' + [\n    pad('Доходы', get('Доходы за период, ₸')),\n    pad('Расходы', get('Расходы по чекам за период, ₸')),\n    pad('База', get('Налогооблагаемая база, ₸')),\n    pad('ИПН', get('ИПН, ₸')),\n    pad('Ранее', '+' + get('Ранее начислено по уведомлению, ₸')),\n  ].map(esc).join('\\n') + '</pre>',\n  `<b>Итого к уплате: ${esc(tax)} ₸</b>`,\n  `Чеков за период: ${esc(get('Чеков за период'))}, из них без вашего ИИН: ${esc(get('Чеков без ИИН покупателя'))}`,\n  '',\n  '<b>📌 Дальше пришлите:</b>',\n  `• выписку Kaspi с <b>${esc(get('Следующая выписка с'))}</b>`,\n  `• чеки с <b>${esc(get('Следующие чеки с'))}</b>`,\n  '',\n  `<a href=\"${sheetUrl}\">Открыть таблицу</a>`,\n].join('\\n');\n\nconst messages = [];\n\nif (cfg.route === 'check') {\n  const r = safe('Новые чеки') || { added: [], dups: [], bad: [] };\n  const parsed = safe('Чеки из ответа') || {};\n  const lines = [];\n  for (const d of r.added) {\n    let line = `✅ ${esc(d.seller)}: ${money(d.total)} (${ru(d.date)})`;\n    if (d.outOfPeriod) line += ', дата до начала периода, в налог не входит';\n    else if (!d.buyer_iin) line += ', без вашего ИИН';\n    lines.push(line);\n  }\n  for (const d of r.dups) lines.push(`↩️ Уже в таблице: ${esc(d.seller)}, ${money(d.total)} (${ru(d.date)})`);\n  if (r.bad.length || (!r.added.length && !r.dups.length)) {\n    lines.push('⚠️ Не смог прочитать чек. Переснимите ближе, ровно и при хорошем свете, чтобы были видны дата, итог и ФП.');\n  }\n  if (parsed.error) lines.push(`Ошибка распознавания: ${esc(parsed.error)}`);\n  lines.push('', taxLine);\n  messages.push(lines.join('\\n'));\n} else if (cfg.route === 'pdf' && (safe('Новые поступления') || {}).invalid) {\n  const r = safe('Новые поступления');\n  messages.push([\n    '⚠️ <b>Выписку не записал</b>: сверка с итогами выписки не сошлась.',\n    ...r.problems.map((p) => `• ${esc(p)}`),\n    ...(r.error ? [`• ${esc(r.error)}`] : []),\n    '',\n    'Пришлите PDF ещё раз. Если повторится, проверьте, что это полная выписка Kaspi со строкой «Итого обороты».',\n    '',\n    taxLine,\n  ].join('\\n'));\n} else if (cfg.route === 'pdf') {\n  const r = safe('Новые поступления') || { added: [], skipped: [], sum: 0 };\n  const lines = [`📄 <b>Выписка принята</b>: ${esc(r.periodFrom)} – ${esc(r.lastOp)}`];\n  if (r.added.length) {\n    lines.push(`Новых поступлений: ${r.added.length} на ${money(r.sum)}`);\n    for (const c of r.added) lines.push(`• ${ru(c.date)} ${esc(c.sender)}: ${money(c.amount)}`);\n  } else {\n    lines.push('Новых поступлений нет (всё уже было в таблице или вне периода).');\n  }\n  for (const c of r.skipped) lines.push(`➖ Не доход (${esc(c.why)}): ${ru(c.date)} ${money(c.amount)}`);\n  lines.push('✔️ Сверка с «Итого обороты» сошлась.', '', taxLine);\n  messages.push(lines.join('\\n'));\n  messages.push(summary);\n} else {\n  const t = cfg.text.toLowerCase();\n  if (t.startsWith('/start') || t.startsWith('/help') || t === 'помощь') {\n    messages.push([\n      '👋 Я считаю налог ИП «МК».',\n      '• Пришлите фото чека или накладной, и я внесу расход.',\n      '• Пришлите PDF-выписку Kaspi, и я внесу поступления (сверю их с «Итого обороты»).',\n      '• Команда /итог покажет текущий расчёт.',\n    ].join('\\n'));\n  } else if (cfg.route === 'xlsx') {\n    messages.push('Excel-выписку я не принимаю: в ней нет итоговой строки для сверки. Выгрузите выписку Kaspi в PDF и пришлите сюда.');\n  } else if (cfg.route === 'unknown') {\n    messages.push('Этот файл я не понимаю. Пришлите фото чека или PDF-выписку Kaspi.');\n  }\n  messages.push(summary);\n}\n\nreturn messages.map((text) => ({ json: { chatId: cfg.chatId, text } }));\n"
+      },
+      "name": "Сообщения",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3100,
+        300
+      ],
+      "id": "4c745a3f-94eb-54c1-9555-b7704c413bf0"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML",
+          "disable_web_page_preview": true
+        }
+      },
+      "name": "Ответ",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3320,
+        300
+      ],
+      "id": "1dbde190-b26e-55ca-9208-e3c62e61f02e"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "=Этот бот закрыт. Ваш chat id: <code>{{ $json.chatId }}</code>\nЕсли это вы, впишите его в узел «Разбор сообщения» (ALLOWED_CHAT_IDS).",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML",
+          "disable_web_page_preview": true
+        }
+      },
+      "name": "Нет доступа",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        680,
+        700
+      ],
+      "id": "b6930058-4664-52cc-af13-d807914605db"
+    }
+  ],
+  "connections": {
+    "Telegram": {
+      "main": [
+        [
+          {
+            "node": "Разбор сообщения",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Разбор сообщения": {
+      "main": [
+        [
+          {
+            "node": "Маршрут",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Маршрут": {
+      "main": [
+        [
+          {
+            "node": "Скачать фото",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Скачать PDF",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Итог: прочитать",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Нет доступа",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Скачать фото": {
+      "main": [
+        [
+          {
+            "node": "Запрос: чек",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Запрос: чек": {
+      "main": [
+        [
+          {
+            "node": "OpenAI: чек",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI: чек": {
+      "main": [
+        [
+          {
+            "node": "Чеки из ответа",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Чеки из ответа": {
+      "main": [
+        [
+          {
+            "node": "Расходы: прочитать",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Расходы: прочитать": {
+      "main": [
+        [
+          {
+            "node": "Новые чеки",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Новые чеки": {
+      "main": [
+        [
+          {
+            "node": "Есть новые чеки?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Есть новые чеки?": {
+      "main": [
+        [
+          {
+            "node": "Расходы: добавить",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Итог: прочитать",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Расходы: добавить": {
+      "main": [
+        [
+          {
+            "node": "Итог: прочитать",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Скачать PDF": {
+      "main": [
+        [
+          {
+            "node": "Запрос: выписка",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Запрос: выписка": {
+      "main": [
+        [
+          {
+            "node": "OpenAI: выписка",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI: выписка": {
+      "main": [
+        [
+          {
+            "node": "Поступления из ответа",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Поступления из ответа": {
+      "main": [
+        [
+          {
+            "node": "Доходы: прочитать",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Доходы: прочитать": {
+      "main": [
+        [
+          {
+            "node": "Новые поступления",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Новые поступления": {
+      "main": [
+        [
+          {
+            "node": "Есть новые поступления?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Есть новые поступления?": {
+      "main": [
+        [
+          {
+            "node": "Доходы: добавить",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Выписки: записать",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Итог: прочитать",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Доходы: добавить": {
+      "main": [
+        [
+          {
+            "node": "Выписки: записать",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Выписки: записать": {
+      "main": [
+        [
+          {
+            "node": "Итог: прочитать",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Итог: прочитать": {
+      "main": [
+        [
+          {
+            "node": "Сообщения",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Сообщения": {
+      "main": [
+        [
+          {
+            "node": "Ответ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Almaty"
+  },
+  "pinData": {}
+}
