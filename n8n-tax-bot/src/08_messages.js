@@ -1,6 +1,6 @@
 // Собирает ответные сообщения в Telegram (HTML-разметка)
 const cfg = $('Разбор сообщения').first().json;
-const rows = $json.values || [];
+const rows = $json.valueRanges?.[0]?.values || $json.values || [];
 const get = (label) => (rows.find((r) => r[0] === label) || [])[1] || '—';
 const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const money = (n) => Math.round(Number(n)).toLocaleString('ru-RU').replace(/ /g, ' ') + ' ₸';
