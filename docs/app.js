@@ -7,8 +7,8 @@ const DEFAULT_STATE = {
   version: 1,
   settings: { currency: '₸', startBalance: 0, reserve: 0 },
   categories: {
-    expense: ['Продукты', 'Кафе', 'Транспорт', 'Дом', 'Связь', 'Здоровье', 'Одежда', 'Развлечения', 'Подарки', 'Кредиты', 'Подписки', 'Другое'],
-    income: ['Зарплата', 'Подработка', 'Подарки', 'Проценты', 'Другое'],
+    expense: ['Продукты', 'Кафе и обеды', 'Кредиты и долги', 'Алименты', 'Налоги', 'Связь и интернет', 'Дети', 'Здоровье', 'Авто и транспорт', 'Личное', 'Покупки', 'Одежда', 'Отдых и праздники', 'Путешествия', 'Юристы', 'Животные', 'Прочее'],
+    income: ['Заказы', 'Продажа вещей', 'Проценты по депозиту', 'Возврат долга', 'Прочее'],
   },
   limits: {},      // { 'Продукты': 80000 } — лимит переменных трат в месяц
   recurring: [],   // постоянные: { id, type, name, amount, category, freq, day, weekday, month, since, active }
@@ -103,7 +103,12 @@ function occurrences(rec, ym) {
   return [`${ym}-${pad(Math.min(Number(rec.day) || 1, dim))}`];
 }
 
-const paidTx = (rec, occ) => state.tx.find((t) => t.recurringId === rec.id && t.occ === occ);
+// Все операции, которыми оплачен платёж (кредит могут гасить несколькими переводами)
+const paidTxs = (rec, occ) => state.tx.filter((t) => t.recurringId === rec.id && t.occ === occ);
+function paidTx(rec, occ) {
+  const list = paidTxs(rec, occ);
+  return list.length ? { list, amount: sum(list.map((t) => t.amount)) } : null;
+}
 
 function fixedItems(ym) {
   const items = [];
@@ -149,24 +154,42 @@ function balanceUpTo(isoInclusive) {
   return b;
 }
 
-// Средние переменные доходы/расходы за последние (до 3) полных месяца с данными
+function median(arr) {
+  if (!arr.length) return 0;
+  const a = [...arr].sort((x, y) => x - y);
+  const mid = Math.floor(a.length / 2);
+  return a.length % 2 ? a[mid] : (a[mid - 1] + a[mid]) / 2;
+}
+
+const firstYM = () => (state.tx.length ? ymOf(state.tx.reduce((min, t) => (t.date < min ? t.date : min), state.tx[0].date)) : null);
+
+// История по полным месяцам до текущего:
+// типичный месяц = медиана за последние 6 месяцев (разовые крупные траты и заказы не искажают прогноз),
+// по категориям — тоже медиана.
 function history() {
-  const cur = currentYM();
-  if (!state.tx.length) return null;
-  const first = state.tx.reduce((min, t) => (t.date < min ? t.date : min), state.tx[0].date);
+  const first = firstYM();
+  if (!first) return null;
   const months = [];
-  for (let ym = addMonths(cur, -1); ym >= ymOf(first) && months.length < 3; ym = addMonths(ym, -1)) months.push(ym);
+  for (let ym = addMonths(currentYM(), -1); ym >= first && months.length < 6; ym = addMonths(ym, -1)) months.push(ym);
   if (!months.length) return null;
   const stats = months.map(monthStats);
-  const n = stats.length;
   const byCat = {};
-  for (const s of stats) for (const [c, v] of Object.entries(s.varExpByCat)) byCat[c] = (byCat[c] || 0) + v / n;
+  const cats = new Set(stats.flatMap((s) => Object.keys(s.varExpByCat)));
+  for (const c of cats) byCat[c] = median(stats.map((s) => s.varExpByCat[c] || 0));
   return {
-    months: n,
-    varExp: sum(stats.map((s) => s.varExp)) / n,
-    varInc: sum(stats.map((s) => s.varInc)) / n,
+    months: stats.length,
+    varExp: median(stats.map((s) => s.varExp)),
+    varInc: median(stats.map((s) => s.varInc)),
     varExpByCat: byCat,
   };
+}
+
+// Переменный доход месяца: если есть тот же месяц год назад — берём его (сезонность), иначе типичный месяц
+function expectedVarInc(ym, fallback) {
+  const prev = addMonths(ym, -12);
+  const first = firstYM();
+  if (first && prev >= first) return { value: monthStats(prev).varInc, seasonal: true };
+  return { value: fallback, seasonal: false };
 }
 
 // Прогноз на текущий месяц
@@ -184,7 +207,7 @@ function currentForecast() {
   const dailyRate = rates.length ? sum(rates) / rates.length : 0;
 
   const projVarExp = s.varExp + dailyRate * daysLeft;
-  const projVarInc = Math.max(s.varInc, hist ? hist.varInc : 0);
+  const projVarInc = Math.max(s.varInc, expectedVarInc(ym, hist ? hist.varInc : 0).value);
   const balanceNow = balanceUpTo(null);
   const endBalance = balanceNow + s.fixedIncLeft + (projVarInc - s.varInc) - s.fixedExpLeft - (projVarExp - s.varExp);
 
@@ -209,8 +232,10 @@ function currentForecast() {
 function futureForecast(n = 6) {
   const cf = currentForecast();
   const varExp = cf.hist ? cf.hist.varExp : cf.projVarExp;
-  const varInc = cf.hist ? cf.hist.varInc : cf.projVarInc;
+  const typicalInc = cf.hist ? cf.hist.varInc : cf.projVarInc;
   let bal = cf.endBalance;
+  let cum = 0;
+  let minCum = 0;
   const rows = [{
     ym: cf.ym, current: true,
     income: cf.s.fixedIncPlan + cf.projVarInc,
@@ -223,12 +248,16 @@ function futureForecast(n = 6) {
     const fx = fixedItems(ym);
     const fixedInc = sum(fx.filter((x) => x.rec.type === 'income').map((x) => x.rec.amount));
     const fixedExp = sum(fx.filter((x) => x.rec.type === 'expense').map((x) => x.rec.amount));
+    const { value: varInc, seasonal } = expectedVarInc(ym, typicalInc);
     const income = fixedInc + varInc;
     const expense = fixedExp + varExp;
     bal += income - expense;
-    rows.push({ ym, income, expense, fixedInc, fixedExp, varInc, varExp, balance: bal });
+    cum += income - expense;
+    minCum = Math.min(minCum, cum);
+    rows.push({ ym, income, expense, fixedInc, fixedExp, varInc, varExp, balance: bal, seasonal });
   }
-  return { cf, rows };
+  // Сколько нужно иметь на конец текущего месяца, чтобы ни в одном из следующих месяцев не уйти в минус
+  return { cf, rows, needReserve: -minCum };
 }
 
 /* ================= UI: общее ================= */
@@ -301,6 +330,8 @@ function renderOverview() {
 
   if (isCurrent) {
     const cf = currentForecast();
+    const { needReserve } = futureForecast(6);
+    const perDaySafe = (cf.available - needReserve) / (cf.daysLeft + 1);
     html += `<div class="card">
       <h2>Баланс сейчас</h2>
       <div class="big ${cf.balanceNow < 0 ? 'expense' : ''}">${money(cf.balanceNow)}</div>
@@ -308,7 +339,10 @@ function renderOverview() {
     </div>
     <div class="card">
       <h2>Можно тратить в день</h2>
-      <div class="big ${cf.perDay < 0 ? 'expense' : 'income'}">${money(Math.max(cf.perDay, 0))}</div>
+      <div class="big ${(needReserve > 0 ? perDaySafe : cf.perDay) < 0 ? 'expense' : 'income'}">${money(Math.max(needReserve > 0 ? perDaySafe : cf.perDay, 0))}</div>
+      ${needReserve > 0 ? `<div class="small ${perDaySafe < 0 ? 'expense' : 'muted'}" style="margin-bottom:4px">${perDaySafe < 0
+        ? `С учётом подушки на низкий сезон (${money(needReserve)}) свободных денег нет: не хватает ${money(needReserve - cf.available)}.`
+        : `С учётом подушки на низкий сезон ${money(needReserve)}.`} Без подушки: ${money(Math.max(cf.perDay, 0))}/день.</div>` : ''}
       <div class="muted small">${cf.perDay < 0
         ? `Денег не хватает на постоянные платежи: дефицит ${money(-cf.available)}`
         : `на ${cf.daysLeft + 1} дн. с учётом оставшихся постоянных платежей${state.settings.reserve ? ' и подушки ' + money(state.settings.reserve) : ''}. Ваш средний темп: ${money(cf.dailyRate)}/день`}</div>
@@ -397,7 +431,9 @@ function renderFixed() {
     <div class="stat"><div class="label">Постоянные доходы</div><div class="value income">${money(s.fixedIncPlan)}</div></div>
     <div class="stat"><div class="label">Постоянные расходы</div><div class="value expense">${money(s.fixedExpPlan)}</div></div>
   </div>
-  <div class="muted small" style="margin-top:8px">После обязательных платежей остаётся: <b class="${s.fixedIncPlan - s.fixedExpPlan < 0 ? 'expense' : 'income'}">${money(s.fixedIncPlan - s.fixedExpPlan)}</b></div></div>`;
+  <div class="muted small" style="margin-top:8px">${s.fixedIncPlan
+    ? `После обязательных платежей остаётся: <b class="${s.fixedIncPlan - s.fixedExpPlan < 0 ? 'expense' : 'income'}">${money(s.fixedIncPlan - s.fixedExpPlan)}</b>`
+    : `Доход нерегулярный — чтобы закрыть обязательные платежи, нужно заработать в этом месяце минимум <b>${money(s.fixedExpPlan)}</b>. Осталось оплатить: <b>${money(s.fixedExpLeft)}</b>`}</div></div>`;
 
   if (!s.fixed.length) {
     html += '<div class="card empty">Нет постоянных платежей в этом месяце.<br>Нажмите «+», чтобы добавить зарплату, аренду, кредит или подписку.</div>';
@@ -420,7 +456,7 @@ function renderFixed() {
 /* ================= Вкладка «Прогноз» ================= */
 
 function renderForecast() {
-  const { cf, rows } = futureForecast(6);
+  const { cf, rows, needReserve } = futureForecast(6);
   const max = Math.max(1, ...rows.map((r) => Math.max(r.income, r.expense)));
   const minBal = rows.reduce((m, r) => (r.balance < m.balance ? r : m), rows[0]);
 
@@ -428,7 +464,8 @@ function renderForecast() {
   if (!cf.hist) {
     html += '<div class="hint">Истории пока нет — прогноз переменных трат строится по темпу текущего месяца. После первого полного месяца он станет точнее.</div>';
   } else {
-    html += `<div class="hint">Переменные траты считаются как среднее за последние ${cf.hist.months} мес.: ${money(cf.hist.varExp)}/мес.</div>`;
+    html += `<div class="hint">Типичный месяц (медиана за ${cf.hist.months} мес.): переменные траты ${money(cf.hist.varExp)}, заказы ${money(cf.hist.varInc)}.
+      Если есть данные за тот же месяц прошлого года, доход берётся оттуда — так учитывается сезон.</div>`;
   }
 
   html += `<div class="card"><h2>Этот месяц</h2>
@@ -440,6 +477,14 @@ function renderForecast() {
     </div>
     <div class="muted small" style="margin-top:8px">Остаток на конец месяца: <b class="${cf.endBalance < 0 ? 'expense' : ''}">${money(cf.endBalance)}</b></div>
   </div>`;
+
+  if (needReserve > 0) {
+    const ok = cf.endBalance >= needReserve;
+    html += `<div class="card"><h2>Подушка на низкий сезон</h2>
+      <div class="big ${ok ? 'income' : 'expense'}">${money(needReserve)}</div>
+      <div class="muted small">Столько нужно иметь на конец месяца, чтобы в ближайшие 6 месяцев не уйти в минус.
+      ${ok ? 'Прогноз остатка это покрывает ✓' : `Не хватает ${money(needReserve - cf.endBalance)} — откладывайте сейчас, пока заказов много.`}</div></div>`;
+  }
 
   html += `<div class="card"><h2>Доходы и расходы на 6 месяцев</h2>
     <div class="chart">${rows.map((r) => `
@@ -453,10 +498,11 @@ function renderForecast() {
 
   html += `<div class="card"><h2>Остаток по месяцам</h2>
     <table class="fc"><thead><tr><th>Месяц</th><th>Доход</th><th>Расход</th><th>Остаток</th></tr></thead><tbody>
-    ${rows.map((r) => `<tr><td>${monthShort(r.ym)}${r.current ? ' •' : ''}</td>
+    ${rows.map((r) => `<tr><td>${monthShort(r.ym)}${r.current ? ' •' : ''}${r.seasonal ? ' ⟲' : ''}</td>
       <td class="income">${nf0.format(r.income)}</td><td class="expense">${nf0.format(r.expense)}</td>
       <td class="${r.balance < 0 ? 'expense' : ''}"><b>${nf0.format(r.balance)}</b></td></tr>`).join('')}
     </tbody></table>
+    ${rows.some((r) => r.seasonal) ? '<div class="muted small">⟲ — доход по тому же месяцу прошлого года</div>' : ''}
     <div class="muted small" style="margin-top:8px">${minBal.balance < 0
       ? `⚠️ В ${MONTHS[parseYM(minBal.ym).m - 1].toLowerCase()} баланс уйдёт в минус (${money(minBal.balance)}). Сократите переменные траты на ${money(-minBal.balance / (rows.indexOf(minBal) + 1))} в месяц, чтобы этого избежать.`
       : `Через 6 месяцев накопится: <b>${money(rows[rows.length - 1].balance)}</b>. Ежемесячно в плюс: ${money((rows[rows.length - 1].balance - rows[0].balance) / 6)}.`}</div>
@@ -465,9 +511,9 @@ function renderForecast() {
   const r1 = rows[1];
   html += `<div class="card"><h2>Структура следующего месяца</h2>
     <div class="row"><div class="main">Постоянные доходы</div><div class="amount income">${money(r1.fixedInc)}</div></div>
-    <div class="row"><div class="main">Переменные доходы (в среднем)</div><div class="amount income">${money(r1.varInc)}</div></div>
+    <div class="row"><div class="main">Переменные доходы (${r1.seasonal ? 'как год назад' : 'типичный месяц'})</div><div class="amount income">${money(r1.varInc)}</div></div>
     <div class="row"><div class="main">Постоянные расходы</div><div class="amount expense">${money(r1.fixedExp)}</div></div>
-    <div class="row"><div class="main">Переменные расходы (в среднем)</div><div class="amount expense">${money(r1.varExp)}</div></div>
+    <div class="row"><div class="main">Переменные расходы (типичный месяц)</div><div class="amount expense">${money(r1.varExp)}</div></div>
   </div>`;
 
   if (cf.byCat.length) {
@@ -678,14 +724,20 @@ document.addEventListener('click', (e) => {
     const occ = el.dataset.occ;
     const existing = paidTx(rec, occ);
     if (existing) {
-      state.tx = state.tx.filter((t) => t !== existing);
+      if (existing.list.length > 1 && !confirm(`Снять отметку и удалить ${existing.list.length} операции по этому платежу?`)) return;
+      state.tx = state.tx.filter((t) => !existing.list.includes(t));
       toast('Отметка снята');
+      save(); render();
     } else {
-      const today = todayISO();
-      state.tx.push({ id: uid(), type: rec.type, amount: rec.amount, category: rec.category, date: occ > today ? today : occ, note: rec.name, recurringId: rec.id, occ });
-      toast(rec.type === 'income' ? 'Доход записан' : 'Платёж записан');
+      promptAmount(`${rec.name}: сколько ${rec.type === 'income' ? 'получено' : 'оплачено'}?`, rec.amount, (v) => {
+        const amount = parseAmount(v);
+        if (!(amount > 0)) return;
+        const today = todayISO();
+        state.tx.push({ id: uid(), type: rec.type, amount, category: rec.category, date: occ > today ? today : occ, note: rec.name, recurringId: rec.id, occ });
+        save(); render();
+        toast(rec.type === 'income' ? 'Доход записан' : 'Платёж записан');
+      });
     }
-    save(); render();
   }
 
   if (a === 'save-settings') {
