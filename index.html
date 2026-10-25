@@ -119,7 +119,13 @@ input.short { width: 90px; }
 .count input { width: 70px; font-family: var(--font-num); text-align: right; }
 .ai-note { white-space: pre-line; font-size: 13px; background: var(--mark-soft); border-radius: 4px; padding: 8px 10px; }
 .params { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; background: var(--surface-2); padding: 10px; border-radius: 4px; }
-.params input { font-size: 16px; font-weight: 600; }
+.params input.num { font-size: 16px; font-weight: 600; }
+.prm { gap: 2px; }
+.plabel { border-color: transparent; background: none; padding: 2px 0; font-size: 12px; color: var(--muted); }
+.plabel:hover, .plabel:focus { border-color: var(--line); background: var(--surface); padding-inline: 6px; }
+.prm-row { display: flex; gap: 6px; align-items: center; }
+.prm-row code { flex: none; }
+.add-prm { align-self: end; justify-self: start; }
 table { border-collapse: collapse; width: 100%; }
 th { font: 500 12px var(--font-body); color: var(--muted); text-align: left; padding: 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
 td { padding: 4px 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }

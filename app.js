@@ -206,7 +206,8 @@
 
     var items = d.items.map(function (it, i) { return itemCard(it, i); }).join('');
     if (!d.items.length) {
-      items = '<div class="empty">Добавьте первое изделие: выберите шаблон, загрузите фото или эскиз, или соберите из деталей вручную.</div>';
+      items = '<div class="empty">Добавьте первое изделие: выберите шаблон, загрузите фото или эскиз, или соберите из деталей вручную.<br><br>' +
+        '<b>Нового изделия нет в шаблонах?</b> «Собрать вручную» → впишите название → «+ размер» (ширина, высота…) → детали с формулами от этих букв → «Сохранить как шаблон». В следующий раз оно появится в списке.</div>';
     }
 
     return '<div class="calc">' +
@@ -272,8 +273,12 @@
   }
 
   function itemCard(it, i) {
-    var params = (it.params || []).map(function (p) {
-      return field(p.label || p.key, '<input id="it-' + i + '-p-' + esc(p.key) + '" type="text" inputmode="decimal" class="num" data-bind="items.' + i + '.values.' + esc(p.key) + '" value="' + esc(it.values && it.values[p.key] != null ? it.values[p.key] : p.def) + '">');
+    // Размеры изделия: подпись можно поправить, буква — имя в формулах деталей
+    var params = (it.params || []).map(function (p, k) {
+      return '<div class="field prm">' +
+        '<input id="it-' + i + '-pl-' + k + '" class="plabel" data-bind="items.' + i + '.params.' + k + '.label" value="' + esc(p.label || '') + '" placeholder="Название размера" aria-label="Название размера">' +
+        '<div class="prm-row"><code title="Буква для формул">' + esc(p.key) + '</code>' +
+        '<input id="it-' + i + '-p-' + esc(p.key) + '" type="text" inputmode="decimal" class="num" data-bind="items.' + i + '.values.' + esc(p.key) + '" value="' + esc(it.values && it.values[p.key] != null ? it.values[p.key] : p.def) + '" aria-label="' + esc(p.label || p.key) + '"></div></div>';
     }).join('');
     var parts = (it.parts || []).map(function (p, j) {
       return '<tr>' +
@@ -297,7 +302,7 @@
         '<label class="count">×<input id="it-' + i + '-count" type="number" min="1" data-bind="items.' + i + '.count" data-num value="' + esc(it.count) + '" aria-label="Количество"> шт</label>' +
       '</div>' +
       (it.aiNote ? '<div class="ai-note">' + esc(it.aiNote) + '</div>' : '') +
-      (params ? '<div class="params">' + params + '</div>' : '') +
+      '<div class="params">' + params + '<button class="btn ghost add-prm" data-action="add-param" data-i="' + i + '">+ размер</button></div>' +
       '<div class="scroll"><table class="parts"><thead><tr><th>Материал</th><th>Шт</th><th>Длина, м</th><th>или всего</th><th>ед.</th><th class="num">кг</th><th class="num">' + cur() + '</th><th>Примечание</th><th></th></tr></thead>' +
       '<tbody>' + parts + '</tbody></table></div>' +
       '<div class="item-foot">' +
@@ -1292,6 +1297,17 @@
     'ai-open': function () { aiOpen = true; render(); var t = $('#ai-text'); if (t) t.focus(); },
     'ai-close': function () { aiOpen = false; render(); },
     'ai-run': runAi,
+    'add-param': function (b) {
+      var it = draft.items[b.dataset.i];
+      it.params = it.params || []; it.values = it.values || {};
+      var used = it.params.map(function (p) { return p.key; });
+      var key = ['W', 'H', 'D', 'L', 'N', 'B', 'A', 'K', 'M', 'T'].filter(function (k) { return used.indexOf(k) < 0; })[0] || 'P' + (used.length + 1);
+      var labels = { W: 'Ширина, м', H: 'Высота, м', D: 'Глубина, м', L: 'Длина, м', N: 'Количество, шт' };
+      it.params.push({ key: key, label: labels[key] || 'Размер', def: 1 });
+      it.values[key] = 1;
+      saveDraft(); render();
+      var el = document.getElementById('it-' + b.dataset.i + '-pl-' + (it.params.length - 1)); if (el) el.select();
+    },
     'add-part': function (b) { draft.items[b.dataset.i].parts.push({ materialId: '', qty: '', note: '' }); saveDraft(); render(); },
     'del-part': function (b) { draft.items[b.dataset.i].parts.splice(b.dataset.j, 1); saveDraft(); render(); },
     'del-item': function (b) { draft.items.splice(b.dataset.i, 1); saveDraft(); render(); },
@@ -1300,7 +1316,7 @@
       var it = draft.items[b.dataset.i];
       var existing = it.templateId && S.templates.find(function (t) { return t.id === it.templateId; });
       var t = {
-        id: existing ? existing.id : uid('tpl'), name: it.name, category: existing ? existing.category : '',
+        id: existing ? existing.id : uid('tpl'), name: it.name, category: existing ? existing.category : 'Мои изделия',
         params: clone(it.params || []).map(function (p) { p.def = C.paramVars(it.params, it.values)[p.key]; return p; }),
         parts: clone(it.parts).filter(function (p) { return p.materialId; }), laborHours: it.laborHours || '', laborCost: it.laborCost || ''
       };
