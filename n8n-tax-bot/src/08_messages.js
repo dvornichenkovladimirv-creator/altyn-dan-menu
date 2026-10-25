@@ -80,6 +80,14 @@ if (cfg.route === 'check') {
   lines.push('✔️ Сверка с «Итого обороты» сошлась.', '', taxLine);
   messages.push(lines.join('\n'));
   messages.push(summary);
+} else if (cfg.route === 'reminder') {
+  messages.push([
+    '⏰ <b>Напоминание: пора внести документы за неделю</b>',
+    `• PDF-выписку Kaspi с <b>${esc(get('Следующая выписка с'))}</b>`,
+    `• чеки с <b>${esc(get('Следующие чеки с'))}</b>`,
+    '',
+    taxLine,
+  ].join('\n'));
 } else {
   const t = cfg.text.toLowerCase();
   if (t.startsWith('/start') || t.startsWith('/help') || t === 'помощь') {

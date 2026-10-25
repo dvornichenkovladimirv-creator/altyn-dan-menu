@@ -27,6 +27,11 @@ if (m.photo && m.photo.length) {
   else route = 'unknown';
 }
 
+// Запуск по расписанию (узел «Каждый понедельник»): напоминание первому из списка
+if (!$json.message) {
+  return [{ json: { chatId: String(ALLOWED_CHAT_IDS[0] || ''), route: 'reminder', fileId: null, fileName: '', text: '', sheet: SHEET_ID, model: MODEL } }];
+}
+
 if (!ALLOWED_CHAT_IDS.includes(chatId)) route = 'denied';
 
 return [{

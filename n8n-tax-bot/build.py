@@ -131,6 +131,15 @@ nodes = [
         "typeVersion": 1.1,
         "position": [0, 300],
     },
+    {
+        "parameters": {"rule": {"interval": [{
+            "field": "weeks", "weeksInterval": 1, "triggerAtDay": [1], "triggerAtHour": 9, "triggerAtMinute": 0,
+        }]}},
+        "name": "Каждый понедельник",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [0, 520],
+    },
     code("Разбор сообщения", "01_parse_message.js", [220, 300]),
     switch("Маршрут", 4, "({check: 0, pdf: 1, denied: 3})[$json.route] ?? 2", [440, 300]),
     # чек
@@ -171,6 +180,7 @@ def link(*targets):
 
 connections = {
     "Telegram": {"main": link("Разбор сообщения")},
+    "Каждый понедельник": {"main": link("Разбор сообщения")},
     "Разбор сообщения": {"main": link("Маршрут")},
     "Маршрут": {"main": [
         [{"node": "Скачать фото", "type": "main", "index": 0}],

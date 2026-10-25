@@ -131,4 +131,18 @@ assert.equal(out[0].json.error, 'rate limit');
 out = await run('06_statement_parse.js', { json: {} });
 assert.equal(out[0].json.st.credits.length, 0);
 
+// Напоминание по расписанию
+{
+  const fn = new AsyncFunction('$json', parseSrc);
+  const r = (await fn({ timestamp: '2026-10-26T09:00:00+05:00' }))[0].json;
+  assert.equal(r.route, 'reminder');
+  assert.equal(r.chatId, '555');
+  nodeOut['Разбор сообщения'] = r;
+  out = await run('08_messages.js', { json: itog });
+  assert.equal(out.length, 1);
+  assert.match(out[0].json.text, /Напоминание/);
+  assert.match(out[0].json.text, /22\.10\.2026/);
+  console.log('\n--- напоминание ---\n' + out[0].json.text);
+}
+
 console.log('\nВсе проверки пройдены');
